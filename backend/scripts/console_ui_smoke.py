@@ -23,7 +23,7 @@ MOCK = r"""() => {
   const j=(body, status=200)=>({ok:status>=200&&status<300,status,json:async()=>body});
   window.fetch = async (url, opts={}) => {
     const u=String(url),method=(opts.method||'GET').toUpperCase(),data=opts.body?JSON.parse(opts.body):{};
-    if(u==='/api/auth/dev-login')return j({access_token:'FAKE_UI_ONLY',user:{id:1,role:'staff',display_name:'社区工作者',community_id:1}});
+    if(u==='/api/auth/login'||u==='/api/auth/dev-login')return j({access_token:'FAKE_UI_ONLY',user:{id:1,role:'staff',display_name:'社区工作者',community_id:1}});
     if(u.startsWith('/api/community/residents')&&method==='GET')return j(window._fake.residents);
     if(u==='/api/community/visits'&&method==='GET')return j(window._fake.visits);
     if(u==='/api/community/stats')return j({resident_count:window._fake.residents.length});

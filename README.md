@@ -15,9 +15,9 @@
 ├── README.md                          本文档，启动入口
 ├── HANDOFF_PROMPT.md                  交给后续 AI 的开发主指令
 ├── backend/
-│   ├── app/                           完整 FastAPI 业务源码（7 类业务路由模块）
+│   ├── app/                           完整 FastAPI 业务源码（8 类业务路由模块，含管理员）
 │   ├── static/console.html            社区员工网页管理台，无需前端构建
-│   ├── tests/                          35 个后端自动化测试
+│   ├── tests/                          57 个后端自动化测试（API 回归 + 安全边界 + 运维配置）
 │   ├── requirements.txt               固定版本运行依赖
 │   ├── requirements-dev.txt           测试依赖
 │   └── .env.example                   开发环境配置模板
@@ -68,6 +68,8 @@ python scripts/dev_start.py --seed
 - 健康检测: http://127.0.0.1:8000/healthz
 - 账号：`staff`、`staff2`、`resident`、`family`、`admin`
 - **仅限本地虚构演示数据**的共同密码：`DemoPass2026!`
+
+管理台登录使用 `/api/auth/login`（与生产同一路径，含锁定与速率限制；演示提示仅在后端显式开启时显示）。**v0.1 升级：模型已加新列/新表，旧 `community_health.db` 需删除后重新 seed，或按 `docs/DEPLOYMENT.md` 用 Alembic 升级。**
 
 `staff` 为春和社区职员；`staff2` 属于另一社区；`resident` 已创建本人档案；`family` 为家属。数据库包含虚构居民及演示测量数据。**禁止将演示账号和密码部署到公网。**
 

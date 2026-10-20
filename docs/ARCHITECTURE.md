@@ -16,9 +16,10 @@
 ## 二、核心表
 
 - `communities`: 社区。
-- `users`: 登录账号、角色、所属社区、微信 OpenID、邀请码。不对 API 暴露密码哈希或 OpenID。
-- `residents`: 居民档案，可由本人或工作人员在取得有效同意后创建。
-- `consent_events`: 追加式“同意/撤回”事件，最新事件决定社区人员能否继续访问。
+- `users`: 登录账号、角色、所属社区、微信 OpenID、邀请码；v0.2 增加锁定计数/锁定截止、TOTP 密钥、`token_version`（改密/登出/停用时提升以立即失效旧 JWT）、最近登录与改密时间。不对 API 暴露密码哈希或 OpenID。
+- `residents`: 居民档案，可由本人或工作人员在取得有效同意后创建；手机号列经 AES-GCM 静态加密。
+- `claim_requests`: v0.2 线下档案认领申请——匹配姓名+手机号仅生成待核验记录，必须同社区工作人员批准后才设置 `owner_user_id`；不匹配的提交不落库且响应相同（防枚举）。
+- `consent_events`: 追加式“同意/撤回”事件，最新事件决定社区人员能否继续访问；v0.2 增加 `review_status/reviewed_by/reviewed_at/review_note`，纸质同意进入待复核队列，被驳回的最新事件立即切断员工访问。
 - `family_grants`: 由档案本人签发，指定家属、字段范围、到期时间、撤回时间。
 - `vitals`: 血压/血糖/体重，记录实际填报人和时间。
 - `questionnaires`: 已发布问卷模板、版本与题目结构。
@@ -26,6 +27,13 @@
 - `reminders`: 到期日 + 完成状态。**没有自动推送任务。**
 - `visits`: 社区工作人员线下随访计划与完成记录。
 - `audit_logs`: 记录动作、操作者和实体编号，不保存健康正文。
+
+## 二·补充 认证与会话（v0.2）
+
+- `POST /api/auth/login` 生产可用密码登录：账号+IP 速率限制（`app/ratelimit.py`，单进程内存实现）、失败锁定、可选 TOTP（`app/totp.py`）、停用检查。
+- JWT 携带 `tv`（token_version），`deps.auth_user` 每次核对；改密、全端登出、管理员停用都会提升版本号使旧令牌即刻失效。
+- 管理员账号管理 `routes/admin.py`：仅账号生命周期，**不开放任何个人健康数据读取**。
+- 生产启动校验 `config.validate_settings`：强密钥、禁演示登录、PostgreSQL、`ALLOWED_HOSTS`、`FIELD_ENCRYPTION_KEY`；中间件：TrustedHost（生产）+ 安全响应头（nosniff/DENY/no-referrer/CSP，生产 HSTS/no-store）。
 
 ## 三、权限原则（对象级检查）
 
@@ -61,5 +69,6 @@
 ## 五、开发适用性
 
 - 本包为了能被实际测试，未移植大型若依 Java 项目。社区规模增大后，可评估成熟权限框架与数据库隔离/索引策略。
-- 数据库首次开发启动通过 `Base.metadata.create_all`，**不是生产迁移系统**。生产代码会拒绝使用 SQLite，但仍需要后续 AI 先补 Alembic 和 PostgreSQL。
+- 数据库：开发首次启动通过 `Base.metadata.create_all`；**生产以 Alembic 迁移为准（`backend/migrations/`），且启动校验拒绝 SQLite**。模型变更必须先出迁移脚本并在临时库验证 up/down。
 - 目前数据库没有完整的删档/导出流程，应用层有部分操作审计；**不能视为已满足法定权利响应、数据生命周期、安全审计**。
+- 登录限速为进程内实现；多实例部署必须替换为共享存储限速（Redis 等）。
