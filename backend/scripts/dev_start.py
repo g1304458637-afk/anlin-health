@@ -2,6 +2,10 @@
 from pathlib import Path
 import argparse
 import os
+import sys
+
+# Allow `python scripts/dev_start.py` from backend/: script dir is on sys.path, not the project root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def load_env(file: Path):
