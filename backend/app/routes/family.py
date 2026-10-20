@@ -5,9 +5,21 @@ from sqlalchemy import select
 from ..db import get_db
 from ..models import User, Resident, FamilyGrant
 from ..deps import auth_user, is_owner, active_grant, audit
+from ..security import new_invite_code
 from ..schemas import FamilyGrantIn, FamilyGrantOut
 
 router = APIRouter(prefix="/api", tags=["family"])
+
+
+@router.post("/me/invite-code/rotate")
+def rotate_invite_code(user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    """Replace the user's family invite code; the old code stops working immediately."""
+    if user.role not in {"resident", "family"}:
+        raise HTTPException(403, "仅居民/家属账号可轮换邀请码")
+    user.invite_code = new_invite_code()
+    audit(db, user, "rotate_invite_code", "user", user.id)
+    db.commit()
+    return {"invite_code": user.invite_code}
 
 
 def grant_output(db: Session, g: FamilyGrant) -> FamilyGrantOut:
@@ -59,6 +71,18 @@ def revoke_family(resident_id: int, grant_id: int, user: User = Depends(auth_use
     if not g.revoked_at:
         g.revoked_at = datetime.now(timezone.utc)
         audit(db, user, "revoke_family_access", "family_grant", g.id)
+        db.commit()
+
+
+@router.post("/residents/{resident_id}/family-grants/{grant_id}/decline", status_code=204)
+def decline_family_grant(resident_id: int, grant_id: int, user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    """Grantee-side refusal: the invited family member can reject a grant made to them."""
+    g = db.get(FamilyGrant, grant_id)
+    if not g or g.resident_id != resident_id or g.grantee_id != user.id:
+        raise HTTPException(404, "授权不存在")
+    if not g.revoked_at:
+        g.revoked_at = datetime.now(timezone.utc)
+        audit(db, user, "decline_family_grant", "family_grant", g.id)
         db.commit()
 
 

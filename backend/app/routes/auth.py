@@ -1,19 +1,100 @@
+import time
+from datetime import datetime, timedelta, timezone
+
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+
 from ..db import get_db
 from ..config import settings
 from ..models import User, Resident
-from ..security import verify_password, access_token, new_invite_code
+from ..ratelimit import login_limiter, wechat_limiter, client_ip
+from ..security import verify_password, validate_password_strength, hash_password, access_token, new_invite_code
 from ..deps import auth_user, audit
-from ..schemas import LoginIn, WxLoginIn, UserOut
+from ..totp import verify_totp
+from ..schemas import LoginIn, WxLoginIn, PasswordChangeIn, TotpLoginIn, UserOut
 
 router = APIRouter(prefix="/api", tags=["auth"])
+
+# One-time WeChat codes: a replayed code is rejected without contacting WeChat again.
+_used_wx_codes: dict[str, float] = {}
+_WX_CODE_TTL_SECONDS = 300.0
+
+
+def _consume_wx_code(code: str) -> bool:
+    """Return False if this exact code was already redeemed recently."""
+    now = time.monotonic()
+    for k, ts in list(_used_wx_codes.items()):
+        if now - ts > _WX_CODE_TTL_SECONDS:
+            _used_wx_codes.pop(k, None)
+    if code in _used_wx_codes:
+        return False
+    _used_wx_codes[code] = now
+    return True
 
 
 def user_out(u: User) -> UserOut:
     return UserOut(id=u.id, username=u.username, display_name=u.display_name, role=u.role, community_id=u.community_id, invite_code=u.invite_code)
+
+
+def _issue_login(user: User, db: Session, action: str) -> dict:
+    user.failed_login_count = 0
+    user.locked_until = None
+    user.last_login_at = datetime.now(timezone.utc)
+    audit(db, user, action, "user", user.id)
+    db.commit()
+    return {"access_token": access_token(user.id, user.token_version), "token_type": "bearer", "user": user_out(user)}
+
+
+@router.post("/auth/login")
+def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
+    """Production-capable username/password login (staff provisioned out-of-band).
+
+    Defenses: per-account+IP rate limit, per-account lockout after repeated
+    failures, optional TOTP second factor, deactivation check, audit trail.
+    """
+    key = f"{client_ip(request)}:{body.username}"
+    if not login_limiter.hit(key, settings.login_rate_per_minute):
+        raise HTTPException(429, "尝试过于频繁，请稍后再试")
+    user = db.scalar(select(User).where(User.username == body.username))
+    now = datetime.now(timezone.utc)
+    if not user or not verify_password(body.password, user.password_hash):
+        if user:
+            user.failed_login_count += 1
+            if user.failed_login_count >= settings.login_max_attempts:
+                user.locked_until = now + timedelta(minutes=settings.login_lockout_minutes)
+                audit(db, user, "account_locked", "user", user.id)
+            db.commit()
+        raise HTTPException(401, "用户名或密码错误")
+    if user.locked_until:
+        if user.locked_until.replace(tzinfo=None) > now.replace(tzinfo=None):
+            raise HTTPException(423, "账号已临时锁定，请稍后再试或联系管理员")
+        user.locked_until = None
+    if not user.is_active:
+        raise HTTPException(403, "账号已停用")
+    if user.totp_secret:
+        raise HTTPException(401, "此账号已开启两步验证", headers={"X-MFA-Required": "totp"})
+    return _issue_login(user, db, "password_login")
+
+
+@router.post("/auth/login/totp")
+def login_totp(body: TotpLoginIn, request: Request, db: Session = Depends(get_db)):
+    key = f"totp:{client_ip(request)}:{body.username}"
+    if not login_limiter.hit(key, settings.login_rate_per_minute):
+        raise HTTPException(429, "尝试过于频繁，请稍后再试")
+    user = db.scalar(select(User).where(User.username == body.username))
+    if not user or not user.totp_secret or not verify_password(body.password, user.password_hash):
+        raise HTTPException(401, "用户名或密码错误")
+    if not verify_totp(user.totp_secret, body.totp_code):
+        audit(db, user, "totp_failed", "user", user.id)
+        db.commit()
+        raise HTTPException(401, "两步验证码不正确")
+    if not user.is_active:
+        raise HTTPException(403, "账号已停用")
+    if user.locked_until and user.locked_until.replace(tzinfo=None) > datetime.now(timezone.utc).replace(tzinfo=None):
+        raise HTTPException(423, "账号已临时锁定，请稍后再试或联系管理员")
+    return _issue_login(user, db, "password_login_totp")
 
 
 @router.post("/auth/dev-login")
@@ -24,9 +105,59 @@ def dev_login(body: LoginIn, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.username == body.username))
     if not user or not user.is_active or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "用户名或密码错误")
-    audit(db, user, "dev_login", "user", user.id)
+    return _issue_login(user, db, "dev_login")
+
+
+@router.get("/auth/demo-status")
+def demo_status():
+    # The web console calls this to decide whether to show demo-credential hints.
+    return {"enabled": bool(settings.demo_auth and settings.app_env != "production")}
+
+
+@router.post("/auth/change-password")
+def change_password(body: PasswordChangeIn, user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(401, "当前密码不正确")
+    reason = validate_password_strength(body.new_password)
+    if reason:
+        raise HTTPException(422, reason)
+    if verify_password(body.new_password, user.password_hash):
+        raise HTTPException(422, "新密码不能与当前密码相同")
+    user.password_hash = hash_password(body.new_password)
+    user.password_updated_at = datetime.now(timezone.utc)
+    user.token_version += 1  # invalidate every existing session everywhere
+    audit(db, user, "change_password", "user", user.id)
     db.commit()
-    return {"access_token": access_token(user.id), "token_type": "bearer", "user": user_out(user)}
+    return {"access_token": access_token(user.id, user.token_version), "token_type": "bearer"}
+
+
+@router.post("/auth/logout-all")
+def logout_all(user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    user.token_version += 1
+    audit(db, user, "logout_all", "user", user.id)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/auth/mfa/totp")
+def setup_totp(user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    """Provision (or rotate) a TOTP secret; the secret is shown exactly once."""
+    from ..totp import new_totp_secret, provisioning_uri
+    user.totp_secret = new_totp_secret()
+    audit(db, user, "mfa_totp_provisioned", "user", user.id)
+    db.commit()
+    return {"secret": user.totp_secret, "uri": provisioning_uri(user.totp_secret, user.username)}
+
+
+@router.delete("/auth/mfa/totp")
+def disable_totp(user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    if not user.totp_secret:
+        raise HTTPException(404, "未开启两步验证")
+    user.totp_secret = None
+    user.token_version += 1
+    audit(db, user, "mfa_totp_disabled", "user", user.id)
+    db.commit()
+    return {"ok": True}
 
 
 async def exchange_wechat_code(code: str) -> str:
@@ -42,14 +173,21 @@ async def exchange_wechat_code(code: str) -> str:
             payload = result.json()
     except (httpx.HTTPError, ValueError):
         raise HTTPException(503, "微信登录接口暂时不可用")
+    if payload.get("errcode") in (40029, 40163, -1) or (payload.get("errcode") and not payload.get("openid")):
+        # Invalid / replayed code or WeChat-side failure: the client must re-login.
+        raise HTTPException(401, "微信登录凭据无效，请重新登录")
     if not payload.get("openid"):
-        raise HTTPException(401, "微信登录失败，请重新尝试")
+        raise HTTPException(503, "微信登录接口暂时不可用")
     # The session_key must never be returned or logged.
     return payload["openid"]
 
 
 @router.post("/auth/wechat")
-async def wechat_login(body: WxLoginIn, db: Session = Depends(get_db)):
+async def wechat_login(body: WxLoginIn, request: Request, db: Session = Depends(get_db)):
+    if not wechat_limiter.hit(client_ip(request), settings.wechat_login_rate_per_minute):
+        raise HTTPException(429, "尝试过于频繁，请稍后再试")
+    if not _consume_wx_code(body.code):
+        raise HTTPException(401, "微信登录凭据无效，请重新登录")
     openid = await exchange_wechat_code(body.code)
     user = db.scalar(select(User).where(User.wechat_openid == openid))
     if not user:
@@ -60,9 +198,7 @@ async def wechat_login(body: WxLoginIn, db: Session = Depends(get_db)):
         db.flush()
     if not user.is_active:
         raise HTTPException(403, "账号不可用")
-    audit(db, user, "wechat_login", "user", user.id)
-    db.commit()
-    return {"access_token": access_token(user.id), "token_type": "bearer", "user": user_out(user)}
+    return _issue_login(user, db, "wechat_login")
 
 
 @router.get("/me", response_model=UserOut)

@@ -12,6 +12,17 @@ class LoginIn(Model):
     password: str = Field(min_length=1, max_length=200)
 
 
+class TotpLoginIn(Model):
+    username: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=200)
+    totp_code: str = Field(min_length=6, max_length=6)
+
+
+class PasswordChangeIn(Model):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=1, max_length=200)
+
+
 class WxLoginIn(Model):
     code: str = Field(min_length=5, max_length=512)
 
@@ -23,6 +34,18 @@ class UserOut(Model):
     role: str
     community_id: int | None
     invite_code: str | None = None
+
+
+class AdminUserOut(Model):
+    id: int
+    username: str
+    display_name: str
+    role: str
+    community_id: int | None
+    is_active: bool
+    mfa_enabled: bool
+    last_login_at: datetime | None
+    password_updated_at: datetime | None
 
 
 class ResidentIn(Model):
@@ -71,7 +94,42 @@ class ConsentOut(Model):
     purpose: str
     method: str
     evidence_ref: str | None
+    review_status: str = "approved"
+    review_note: str | None = None
+    reviewed_at: datetime | None = None
     created_at: datetime
+
+
+class ConsentReviewIn(Model):
+    approve: bool
+    note: str | None = Field(default=None, max_length=300)
+
+
+class ClaimRequestIn(Model):
+    resident_id: int = Field(ge=1)
+    full_name: str = Field(min_length=2, max_length=80)
+    phone: str | None = Field(default=None, max_length=30)
+    note: str | None = Field(default=None, max_length=300)
+
+
+class ClaimRequestOut(Model):
+    id: int
+    resident_id: int
+    requester_id: int
+    requester_name: str
+    status: str
+    stated_name: str
+    stated_phone: str | None
+    name_matched: bool
+    phone_matched: bool
+    note: str | None
+    reviewed_at: datetime | None
+    created_at: datetime
+
+
+class ClaimReviewIn(Model):
+    approve: bool
+    note: str | None = Field(default=None, max_length=300)
 
 
 class VitalIn(Model):

@@ -1,5 +1,12 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
 
 
 @dataclass(frozen=True)
@@ -11,6 +18,18 @@ class Settings:
     wechat_appid: str = os.getenv("WECHAT_APPID", "")
     wechat_appsecret: str = os.getenv("WECHAT_APPSECRET", "")
     cors_origins: tuple[str, ...] = tuple(x.strip() for x in os.getenv("CORS_ORIGINS", "").split(",") if x.strip())
+    # Comma-separated list of hosts that may reach a production deployment.
+    allowed_hosts: tuple[str, ...] = tuple(x.strip() for x in os.getenv("ALLOWED_HOSTS", "").split(",") if x.strip())
+    # Access-token lifetime; short-lived by design so a stolen bearer token ages out quickly.
+    session_ttl_minutes: int = _int_env("SESSION_TTL_MINUTES", 480)
+    # AES-GCM key (base64, 32 bytes) for sensitive fields at rest; unset keeps development plaintext.
+    field_encryption_key: str = os.getenv("FIELD_ENCRYPTION_KEY", "")
+    # Brute-force controls for username/password login.
+    login_max_attempts: int = _int_env("LOGIN_MAX_ATTEMPTS", 5)
+    login_lockout_minutes: int = _int_env("LOGIN_LOCKOUT_MINUTES", 15)
+    login_rate_per_minute: int = _int_env("LOGIN_RATE_PER_MINUTE", 10)
+    # WeChat code2session attempts allowed per IP per minute.
+    wechat_login_rate_per_minute: int = _int_env("WECHAT_LOGIN_RATE_PER_MINUTE", 10)
 
 
 settings = Settings()
@@ -26,3 +45,7 @@ def validate_settings() -> None:
             raise RuntimeError("ENABLE_DEMO_AUTH may not run in production")
         if settings.database_url.startswith("sqlite:"):
             raise RuntimeError("Production requires PostgreSQL; SQLite is development-only")
+        if not settings.allowed_hosts:
+            raise RuntimeError("Production requires ALLOWED_HOSTS to restrict the Host header")
+        if not settings.field_encryption_key:
+            raise RuntimeError("Production requires FIELD_ENCRYPTION_KEY (base64 of 32 random bytes) for sensitive columns")

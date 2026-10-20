@@ -1,6 +1,7 @@
 from datetime import datetime, timezone, date
 from sqlalchemy import String, Integer, Boolean, DateTime, Date, ForeignKey, JSON, Text, Float, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from .crypto import EncryptedString
 from .db import Base
 
 
@@ -25,6 +26,16 @@ class User(Base):
     wechat_openid: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
     invite_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Brute-force defenses for password login.
+    failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Optional TOTP factor; presence forces the code at password login.
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Raised on password change / global sign-out; older tokens stop working immediately.
+    token_version: Mapped[int] = mapped_column(Integer, default=0)
+    password_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deactivated_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -37,7 +48,26 @@ class Resident(Base):
     name: Mapped[str] = mapped_column(String(80))
     birth_year: Mapped[int] = mapped_column(Integer)
     sex: Mapped[str] = mapped_column(String(12), default="undisclosed")
-    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Encrypted at rest when FIELD_ENCRYPTION_KEY is configured.
+    phone: Mapped[str | None] = mapped_column(EncryptedString(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ClaimRequest(Base):
+    """Offline-verified archive claim: name+phone alone never grants ownership."""
+    __tablename__ = "claim_requests"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    resident_id: Mapped[int] = mapped_column(ForeignKey("residents.id"), index=True)
+    requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    community_id: Mapped[int] = mapped_column(ForeignKey("communities.id"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending/approved/rejected
+    stated_name: Mapped[str] = mapped_column(String(80))
+    stated_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    name_matched: Mapped[bool] = mapped_column(Boolean, default=False)
+    phone_matched: Mapped[bool] = mapped_column(Boolean, default=False)
+    note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -50,6 +80,11 @@ class ConsentEvent(Base):
     granted: Mapped[bool] = mapped_column(Boolean)
     method: Mapped[str] = mapped_column(String(30))
     evidence_ref: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Evidence review chain for paper-assisted events; resident-self events are auto-approved.
+    review_status: Mapped[str] = mapped_column(String(16), default="approved")
+    review_note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

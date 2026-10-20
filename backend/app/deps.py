@@ -15,12 +15,15 @@ def auth_user(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)
     if not credentials:
         raise HTTPException(401, "请先登录")
     try:
-        uid = decode_token(credentials.credentials)
+        uid, token_version = decode_token(credentials.credentials)
     except (jwt.PyJWTError, ValueError, TypeError):
         raise HTTPException(401, "登录已失效")
     user = db.get(User, uid)
     if not user or not user.is_active:
         raise HTTPException(401, "账号不可用")
+    # Password change or global sign-out bumps token_version; older tokens die here.
+    if token_version != user.token_version:
+        raise HTTPException(401, "登录已失效，请重新登录")
     return user
 
 
@@ -34,7 +37,10 @@ def require_roles(*roles):
 
 def consent_active(db: Session, resident_id: int) -> bool:
     ev = db.scalar(select(ConsentEvent).where(ConsentEvent.resident_id == resident_id, ConsentEvent.purpose == "community_care").order_by(ConsentEvent.id.desc()).limit(1))
-    return bool(ev and ev.granted)
+    if not ev or not ev.granted:
+        return False
+    # A reviewed-and-rejected paper consent cuts staff access immediately.
+    return ev.review_status != "rejected"
 
 
 def is_owner(user: User, resident: Resident) -> bool:

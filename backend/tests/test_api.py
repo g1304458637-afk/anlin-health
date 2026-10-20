@@ -223,8 +223,12 @@ def test_wechat_login_creates_only_low_privilege_user(client,monkeypatch):
     data=response.json()
     assert data['user']['role']=='resident'
     assert 'wechat_openid' not in data['user']
-    again=client.post('/api/auth/wechat',json=body)
+    # A fresh code mapping to the same openid logs into the same account.
+    again=client.post('/api/auth/wechat',json={'code':'FAKE-WECHAT-LOGIN-CODE-2'})
     assert again.json()['user']['id']==data['user']['id']
+    # The exact same code must never be redeemed twice (replay protection).
+    replay=client.post('/api/auth/wechat',json=body)
+    assert replay.status_code==401
     assert client.get('/api/admin/summary',headers={'Authorization':'Bearer '+data['access_token']}).status_code==403
 
 
