@@ -1,0 +1,40 @@
+from contextlib import asynccontextmanager
+from pathlib import Path
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from .db import engine, Base
+from .config import settings, validate_settings
+from . import models  # noqa: F401 - registers mappings
+from .routes import auth, residents, vitals, questionnaires, reminders, family, visits
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    validate_settings()
+    # Pilot convenience only; production requires Alembic-managed schema migrations.
+    if settings.app_env != "production":
+        Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title="社区健康管理 API（试点工程）", version="0.1.0", lifespan=lifespan,
+    description="供社区和居民使用的健康记录与日常关怀试点系统。非医疗诊断产品。")
+if settings.cors_origins:
+    app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_credentials=False,
+                       allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type"])
+for router in [auth.router, residents.router, vitals.router, questionnaires.router, reminders.router, family.router, visits.router]:
+    app.include_router(router)
+
+
+@app.get("/healthz", tags=["operations"])
+def health():
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+    return {"status": "ok", "service": "community-health", "version": "0.1.0"}
+
+
+@app.get("/console", include_in_schema=False)
+def console():
+    return FileResponse(Path(__file__).resolve().parents[1] / "static" / "console.html")

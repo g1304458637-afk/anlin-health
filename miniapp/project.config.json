@@ -1,0 +1,10 @@
+{
+  "description": "安邻健康：原生微信小程序试点工程。请在微信开发者工具中替换 appid，并配置后端域名。",
+  "projectname": "community-health-starter",
+  "appid": "touristappid",
+  "compileType": "miniprogram",
+  "libVersion": "3.6.0",
+  "setting": {"urlCheck": false, "es6": true, "enhance": true, "minified": false},
+  "simulatorType": "wechat",
+  "miniprogramRoot": "./"
+}

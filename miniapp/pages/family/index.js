@@ -1,0 +1,12 @@
+const {request,myResident,message,requireLogin,fmtDate}=require('../../utils/api');
+Page({data:{role:'',residentId:null,myCode:'',inviteCode:'',canProfile:true,canVitals:true,durations:[{days:7,label:'7天'},{days:30,label:'30天'},{days:90,label:'90天'},{days:365,label:'365天'}],durationIndex:1,grants:[],shared:[]},
+  async onShow(){if(!requireLogin())return;try{const me=await request('/api/me');this.setData({role:me.role,myCode:me.invite_code});if(me.role==='family')await this.loadShared();else if(me.role==='resident'){try{const r=await myResident();this.setData({residentId:r.id});await this.loadGrants()}catch(e){if(e.statusCode===404)message(new Error('请先创建自己的健康档案'));else throw e}}}catch(e){message(e)}},
+  changeInvite(e){this.setData({inviteCode:e.detail.value})},toggleProfile(){this.setData({canProfile:!this.data.canProfile})},toggleVitals(){this.setData({canVitals:!this.data.canVitals})},chooseDuration(e){this.setData({durationIndex:Number(e.detail.value)})},
+  async loadGrants(){const list=await request(`/api/residents/${this.data.residentId}/family-grants`);this.setData({grants:list.map(x=>({...x,expiration:fmtDate(x.expires_at)}))})},
+  async loadShared(){this.setData({shared:await request('/api/family/shared-residents')})},
+  async grant(){if(!this.data.residentId){message(new Error('请先创建档案'));return}try{await request(`/api/residents/${this.data.residentId}/family-grants`,'POST',{invite_code:this.data.inviteCode.trim(),can_profile:this.data.canProfile,can_vitals:this.data.canVitals,expires_in_days:this.data.durations[this.data.durationIndex].days});this.setData({inviteCode:''});await this.loadGrants();wx.showToast({title:'授权成功'})}catch(e){message(e)}},
+  revoke(e){wx.showModal({title:'撤回家属授权',content:'撤回后，该家属立即无法继续通过系统查看该授权内容。',success:async r=>{if(!r.confirm)return;try{await request(`/api/residents/${this.data.residentId}/family-grants/${e.currentTarget.dataset.id}`,'DELETE');await this.loadGrants();wx.showToast({title:'已撤回'})}catch(err){message(err)}}})},
+  copyCode(){wx.setClipboardData({data:this.data.myCode})},viewVitals(e){wx.navigateTo({url:`/pages/vitals/index?resident_id=${e.currentTarget.dataset.id}&readonly=1`})},
+  familyMode(){wx.showModal({title:'切换为家属身份',content:'未创建居民档案的账号才可以切换；切换后需要家人主动授权。',success:async r=>{if(!r.confirm)return;try{await request('/api/me/family-mode','POST',{});this.setData({role:'family'});await this.loadShared()}catch(e){message(e)}}})},
+  logout(){wx.removeStorageSync('access_token');wx.reLaunch({url:'/pages/login/index'})}
+});

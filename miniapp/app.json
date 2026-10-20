@@ -1,0 +1,15 @@
+{
+  "pages": [
+    "pages/login/index",
+    "pages/home/index",
+    "pages/profile/index",
+    "pages/vitals/index",
+    "pages/questionnaires/index",
+    "pages/answer/index",
+    "pages/reminders/index",
+    "pages/family/index"
+  ],
+  "window": {"navigationBarTitleText": "安邻健康", "navigationBarBackgroundColor": "#F6F8F7", "navigationBarTextStyle": "black", "backgroundColor": "#F6F8F7"},
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

@@ -1,0 +1,23 @@
+# LOCAL DEMO ONLY. Bind loopback. Do not deploy this compose file to a public server.
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: ops/Dockerfile
+    environment:
+      APP_ENV: development
+      ENABLE_DEMO_AUTH: "true"
+      DATABASE_URL: sqlite:////app/data/community_health.db
+      SECRET_KEY: ${SECRET_KEY:-LOCAL_DEMO_ONLY_NOT_FOR_PRODUCTION_please_change}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - community_demo_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  community_demo_data:

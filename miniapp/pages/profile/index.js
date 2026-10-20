@@ -1,0 +1,8 @@
+const {request,myResident,message,requireLogin}=require('../../utils/api');
+Page({data:{resident:null,communities:[],communityId:null,chosenName:'',name:'',birthYear:'',agreed:false,loading:false},
+  async onShow(){if(!requireLogin())return;try{const communities=await request('/api/communities');this.setData({communities});try{this.setData({resident:await myResident()})}catch(e){if(e.statusCode!==404)throw e}}catch(e){message(e)}},
+  changeName(e){this.setData({name:e.detail.value})},changeBirth(e){this.setData({birthYear:e.detail.value})},toggleAgree(){this.setData({agreed:!this.data.agreed})},
+  chooseCommunity(e){const item=this.data.communities[Number(e.detail.value)];if(item)this.setData({communityId:item.id,chosenName:item.name})},
+  async save(){if(!this.data.agreed){wx.showToast({title:'请先明确同意',icon:'none'});return}if(!this.data.communityId){wx.showToast({title:'请选择社区',icon:'none'});return}this.setData({loading:true});try{const r=await request('/api/residents/me','POST',{name:this.data.name.trim(),birth_year:Number(this.data.birthYear),sex:'undisclosed',community_id:this.data.communityId,consent_to_community_care:true});this.setData({resident:r});wx.showToast({title:'建档完成'})}catch(e){message(e)}finally{this.setData({loading:false})}},
+  toggleConsent(){const r=this.data.resident;const newValue=!r.consent_active;wx.showModal({title:newValue?'重新授权':'确认撤回授权',content:newValue?'确认允许当前社区继续提供健康档案管理服务？':'撤回后社区工作人员将立即无法访问健康档案。',success:async res=>{if(!res.confirm)return;try{await request(`/api/residents/${r.id}/consents`,'POST',{granted:newValue});this.setData({resident:await myResident()});wx.showToast({title:'已更新授权'})}catch(e){message(e)}}})}
+});

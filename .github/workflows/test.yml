@@ -1,0 +1,31 @@
+name: Backend and miniapp static checks
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements-dev.txt
+      - name: Test backend
+        working-directory: backend
+        run: python -m pytest -q
+      - name: Validate miniapp source syntax
+        run: |
+          node --version
+          find miniapp -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          files=list(Path('miniapp').rglob('*.json'))
+          for f in files: json.loads(f.read_text('utf-8'))
+          print('Valid JSON:',len(files))
+          PY

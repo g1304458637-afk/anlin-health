@@ -1,0 +1,13 @@
+.DS_Store
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.db
+*.sqlite3
+node_modules/
+miniprogram_npm/
+.vscode/
+.idea/
+coverage.xml
