@@ -90,6 +90,7 @@ class ConsentIn(Model):
 
 class ConsentOut(Model):
     id: int
+    resident_id: int
     granted: bool
     purpose: str
     method: str

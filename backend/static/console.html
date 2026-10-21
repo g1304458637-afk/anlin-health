@@ -89,16 +89,66 @@ tbody tr:last-child td{border:0}
 .checkbox{display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#53625F;line-height:1.7;margin-top:12px}
 .checkbox input{margin-top:4px;accent-color:var(--green)}
 .hidden{display:none!important}
+.view.hidden{display:none}
+.view-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:4px 0 18px}
+.view-title{font-size:24px;font-weight:600;letter-spacing:-.02em;margin:0 0 4px}
+.nav>div{cursor:pointer}
+.search{width:min(260px,100%);background:#FBFCFC;border:1px solid #DFE4E6;border-radius:999px;padding:9px 14px;outline:0;font-size:13px}
+.search:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(248,83,63,.13)}
+.queue-item{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.queue-item:last-child{border:0}
+.queue-item .grow{flex:1;min-width:160px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:#F6F7F8;border-radius:8px;padding:3px 8px}
+.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.settings-grid .panel h3{margin-bottom:12px}
+.acct{display:grid;gap:8px;margin-top:12px;font-size:13.5px}
+.acct b{font-weight:600}
+.btn-danger:hover{background:#FDF0EE}
+.statbar-svg{width:100%;height:auto;display:block}
+@media(max-width:1050px){.settings-grid{grid-template-columns:1fr}.view-head{flex-wrap:wrap}}
 @media(max-width:1050px){.layout{grid-template-columns:1fr}.side{display:none}.main{padding:25px 22px}.content-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.grid{grid-template-columns:1fr}.hero{padding:24px 20px 40px}.hero-icon{display:none}.page-title{font-size:27px}.pill{display:none}.panel{padding:22px 17px}.main{padding:20px 14px}}
 </style></head><body>
 <div class="topbar">演示页面 · 所有数据均为虚构示例 · 本产品为非诊断的健康记录与随访协同试点工具</div>
-<div class="layout"><aside class="side"><div class="brand"><span class="brandmark">安</span><span>安邻健康<small>COMMUNITY CARE</small></span></div><div class="nav"><div class="active">◈ &nbsp; 工作概览</div><div>☰ &nbsp; 居民健康档案</div><div>◷ &nbsp; 入户随访管理</div><div>◎ &nbsp; 健康数据统计</div><div>⚙ &nbsp; 系统设置（待完善）</div></div><div class="side-foot">数字化社区健康关怀<br>演示环境 · 不可用于真实医疗诊断</div></aside>
-<main class="main"><div class="top"><div><div class="eyebrow">COMMUNITY HEALTH CENTER</div><h1 class="page-title">社区健康工作台</h1><div class="sub" id="greet">让每一份健康关怀，都有迹可循。</div></div><div class="topright"><span class="pill">仅限授权工作人员</span><span class="profile-dot" id="avatar">安</span><button class="btn btn-sm" onclick="logout()">退出</button></div></div>
+<div class="layout"><aside class="side"><div class="brand"><span class="brandmark">安</span><span>安邻健康<small>COMMUNITY CARE</small></span></div><div class="nav" id="sideNav"><div class="active" data-view="overview" onclick="switchView('overview')">◈ &nbsp; 工作概览</div><div data-view="residents" onclick="switchView('residents')">☰ &nbsp; 居民健康档案</div><div data-view="visits" onclick="switchView('visits')">◷ &nbsp; 入户随访管理</div><div data-view="stats" onclick="switchView('stats')">◎ &nbsp; 健康数据统计</div><div data-view="settings" onclick="switchView('settings')">⚙ &nbsp; 安全与设置</div></div><div class="side-foot">数字化社区健康关怀<br>演示环境 · 不可用于真实医疗诊断</div></aside>
+<main class="main">
+<section class="view" id="view-overview">
+<div class="top"><div><div class="eyebrow">COMMUNITY HEALTH CENTER</div><h1 class="page-title">社区健康工作台</h1><div class="sub" id="greet">让每一份健康关怀，都有迹可循。</div></div><div class="topright"><span class="pill">仅限授权工作人员</span><span class="profile-dot" id="avatar">安</span><button class="btn btn-sm" onclick="logout()">退出</button></div></div>
 <section class="hero"><div><h2>用更有温度的方式，做好每一次社区关怀。</h2><p>集中管理居民健康档案、日常测量与线下随访。问卷敏感答案不对社区工作人员展示；无有效授权的居民数据不可访问。</p></div><div class="hero-icon">✳</div><div class="hero-pulse" id="heroPulse" aria-hidden="true"></div></section>
 <div class="grid"><section class="stat"><div class="stat-label">管理中的居民 <span class="chip">已取得授权</span></div><div id="residentCount" class="value">—</div><div class="foot">当前社区的有效居民档案</div></section><section class="stat"><div class="stat-label">待完成走访 <span class="chip">工作提醒</span></div><div class="value" id="visitCount">—</div><div class="foot">需要跟进的社区服务任务</div></section><section class="stat"><div class="stat-label">今日日期 <span class="chip">本地时间</span></div><div class="value" style="font-size:27px;margin-top:21px" id="today">—</div><div class="foot">近期重点：居民授权与随访服务</div></section></div>
 <div class="content-grid"><section class="panel"><div class="panel-head"><div><h3>居民健康档案</h3><div class="sub" style="margin-top:6px">仅显示当前社区且授权有效的居民</div></div><button class="btn btn-primary" id="newResident" onclick="showCreate()">＋ 登记居民</button></div><div class="field"><input id="search" placeholder="按姓名搜索居民" oninput="renderResidents()" /></div><div class="tablewrap"><table><thead><tr><th>居民姓名</th><th>出生年份</th><th>登记方式</th><th>知情同意</th><th>操作</th></tr></thead><tbody id="residentRows"><tr><td colspan="5">正在读取...</td></tr></tbody></table></div></section>
 <section class="panel"><div class="panel-head"><div><h3>随访任务</h3><div class="sub" style="margin-top:6px">线下工作闭环</div></div><button class="btn" onclick="showVisit()">＋ 新建</button></div><div id="visitRows"><div class="empty">正在读取...</div></div></section></div>
+</section>
+
+<section class="view hidden" id="view-residents">
+ <div class="view-head"><div><h2 class="view-title">居民健康档案</h2><div class="sub">本社区全部档案 · 认领核验 · 同意证据复核</div></div><button class="btn btn-primary" onclick="showCreate()">＋ 登记居民</button></div>
+ <div class="panel" style="margin-bottom:18px"><div class="panel-head" style="margin-bottom:10px"><h3>待核验认领申请</h3><span class="chip" id="claimCount">0</span></div><div id="claimQueue" class="empty">正在读取...</div></div>
+ <div class="panel" style="margin-bottom:18px"><div class="panel-head" style="margin-bottom:10px"><h3>待复核同意证据</h3><span class="chip" id="consentCount">0</span></div><div id="consentQueue" class="empty">正在读取...</div></div>
+ <div class="panel"><div class="panel-head" style="margin-bottom:10px"><h3>全部居民</h3><input id="search2" class="search" placeholder="按姓名搜索" oninput="renderResidentsTable()"></div><div class="tablewrap"><table><thead><tr><th>居民姓名</th><th>出生年份</th><th>登记方式</th><th>知情同意</th><th>操作</th></tr></thead><tbody id="residentTable2"><tr><td colspan="5">正在读取...</td></tr></tbody></table></div></div>
+</section>
+
+<section class="view hidden" id="view-visits">
+ <div class="view-head"><div><h2 class="view-title">入户随访管理</h2><div class="sub">计划、完成与记录留痕</div></div><button class="btn btn-primary" onclick="showVisit()">＋ 新建走访</button></div>
+ <div class="panel"><div id="visitList" class="empty">正在读取...</div></div>
+</section>
+
+<section class="view hidden" id="view-stats">
+ <div class="view-head"><div><h2 class="view-title">健康数据统计</h2><div class="sub">聚合统计 · 不含问卷原始答案</div></div></div>
+ <div class="grid" id="statChips"></div>
+ <div class="panel" style="margin-bottom:18px"><div class="panel-head" style="margin-bottom:8px"><h3>近 14 天测量次数</h3></div><div id="statChart"></div></div>
+ <div class="panel"><div class="panel-head" style="margin-bottom:10px"><h3>居民最新测量</h3></div><div class="tablewrap"><table><thead><tr><th>居民</th><th>最新血压</th><th>最新血糖</th><th>最新体重</th><th>记录数</th></tr></thead><tbody id="latestBody"><tr><td colspan="5">正在读取...</td></tr></tbody></table></div></div>
+</section>
+
+<section class="view hidden" id="view-settings">
+ <div class="view-head"><div><h2 class="view-title">安全与设置</h2><div class="sub">账号密码 · 两步验证 · 会话管理</div></div></div>
+ <div class="settings-grid">
+  <div class="panel"><h3>账号信息</h3><div id="acctInfo" class="acct">—</div></div>
+  <div class="panel"><h3>修改密码</h3><div class="field"><label for="pwCur">当前密码</label><input id="pwCur" type="password" autocomplete="current-password"></div><div class="field"><label for="pwNew">新密码</label><input id="pwNew" type="password" autocomplete="new-password" placeholder="≥10位，含数字/大小写/符号至少三类"></div><button class="btn btn-primary" onclick="changePassword()">更新密码</button><div class="helper">修改后其他设备会全部登出。</div></div>
+  <div class="panel"><h3>两步验证（TOTP）</h3><p class="sub" style="line-height:1.8;margin-bottom:12px">为账号绑定认证器 App，密码登录时需再输入 6 位验证码。</p><div id="mfaBox"><button class="btn" onclick="setupMFA()">开通 / 重置</button> <button class="btn btn-danger" onclick="disableMFA()">关闭</button></div><div id="mfaSecret" class="hidden"></div></div>
+  <div class="panel"><h3>会话</h3><p class="sub" style="line-height:1.8;margin-bottom:12px">在所有设备上退出登录，已签发令牌立即失效。</p><button class="btn btn-danger" onclick="logoutAllDevices()">全端登出</button></div>
+ </div>
+</section>
+
 <div class="sub" style="margin-top:25px;line-height:1.8">使用须知：本工作台仅供开发试点。数据为虚构演示内容，不能据此做医疗诊断。接入真实居民信息前需完成合规、安全、隐私及数据处理审查。</div></main></div>
 <div class="login-shade" id="loginShade"><form class="login-card" onsubmit="event.preventDefault();login()"><div class="brand" style="color:#141619"><span class="brandmark" style="background:linear-gradient(135deg,#5B8DEF,#6A4CEB)">安</span>安邻健康</div><h2>欢迎回到工作台</h2><p>社区居民健康服务 · 员工安全登录</p><div class="field"><label for="username">账号</label><input id="username" autocomplete="username" placeholder="请输入工作人员账号" required></div><div class="field"><label for="password">密码</label><input id="password" type="password" autocomplete="current-password" placeholder="请输入密码" required></div><button class="btn btn-primary" type="submit">登录工作台 →</button><div class="helper hidden" id="demoHint">演示账号：staff / DemoPass2026!<br>演示入口仅限 APP_ENV=development 且 ENABLE_DEMO_AUTH=true。正式环境需使用机构开通的工作人员账号。</div></form></div>
 <div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()"><div class="modal"><h3 id="modalTitle">操作</h3><div class="sub" id="modalDesc"></div><form id="modalForm"><div id="modalFields"></div><footer><button type="button" class="btn" onclick="closeModal()">取消</button><button type="submit" class="btn btn-primary" id="modalSubmit">确认</button></footer></form></div></div><div id="toast" class="toast hidden"></div>
@@ -123,6 +173,126 @@ function renderMetricFields(){const t=$('metricType')?.value;if(!$('metricFields
 function showVisit(){if(!residents.length)return notify('请先登记居民');let opts=residents.map(r=>`<option value="${r.id}">${clean(r.name)}</option>`).join('');modal('新增线下随访','为居民安排一次社区走访。','<div class="field"><label>居民</label><select name="resident_id">'+opts+'</select></div>'+field('走访日期','due_date','date')+'<div class="field"><label>工作备注（选填）</label><textarea name="note" maxlength="500" rows="3"></textarea></div>',async d=>{await api('/api/community/visits','POST',{resident_id:Number(d.get('resident_id')),due_date:d.get('due_date'),note:d.get('note')||null})})}
 async function finishVisit(id){if(!confirm('确认已完成本次走访？'))return;try{await api('/api/community/visits/'+id+'/finish','PATCH',{note:'线下走访已完成'});await refresh();notify('已标记完成')}catch(e){notify(e.message)}}
 </script><script>
+/* ------- 多视图工作台 ------- */
+function switchView(v){
+  if(!me){logout();return}
+  currentView=v;
+  document.querySelectorAll('#sideNav > div').forEach(function(el){el.classList.toggle('active',el.dataset.view===v)});
+  document.querySelectorAll('.view').forEach(function(el){el.classList.toggle('hidden',el.id!=='view-'+v)});
+  if(v==='residents')loadResidentsView();
+  if(v==='visits')renderVisitList();
+  if(v==='stats')loadStats();
+  if(v==='settings')renderSettings();
+}
+let currentView='overview';
+function renderResidentsTable(){
+  if(me.role!=='staff')return;
+  const box=document.getElementById('residentTable2');
+  if(!box){setTimeout(renderResidentsTable,300);return}
+  const q=(document.getElementById('search2')?.value||'').trim();
+  const arr=residents.filter(r=>r.name.includes(q));
+  box.innerHTML=arr.map(r=>'<tr><td><span class="name-cell"><span class="avatar">'+clean(r.name.slice(0,1))+'</span>'+clean(r.name)+'</span></td><td>'+r.birth_year+'</td><td>'+(r.owner_user_id?'自主建档':'协助登记')+'</td><td><span class="tag">已授权</span></td><td><button class="btn btn-sm" onclick="showVital('+r.id+')">＋ 记录指标</button> <button class="btn btn-sm btn-danger" onclick="withdrawConsent('+r.id+')">撤回授权</button></td></tr>').join('')||'<tr><td colspan="5" class="empty">没有符合条件的居民</td></tr>';
+}
+async function loadResidentsView(){
+  if(!me){return}
+  if(me.role!=='staff'){
+    document.getElementById('residentTable2').innerHTML='<tr><td colspan="5" class="empty">管理员不读取居民个人明细</td></tr>';
+    document.getElementById('claimQueue').innerHTML='<div class="empty">工作人员专属队列</div>';
+    document.getElementById('consentQueue').innerHTML='<div class="empty">工作人员专属队列</div>';
+    return;
+  }
+  try{residents=await api('/api/community/residents?limit=100')}catch(e){notify(e.message);return}
+  renderResidentsTable();loadClaims();loadConsentReviews();
+}
+async function withdrawConsent(id){
+  const ref=prompt('撤回该居民的社区护理授权：\n请输入机构留存的线下撤回证据编号：');
+  if(!ref)return;
+  try{await api('/api/residents/'+id+'/consents','POST',{granted:false,evidence_ref:ref});notify('已撤回授权，工作人员立即失去访问');loadResidentsView()}catch(e){notify(e.message)}
+}
+async function loadClaims(){
+  try{
+    const list=await api('/api/community/claim-requests?status=pending');
+    document.getElementById('claimCount').textContent=list.length;
+    document.getElementById('claimQueue').innerHTML=list.length?list.map(c=>'<div class="queue-item"><b>'+clean(c.requester_name)+'</b><span>申请认领档案 #'+c.resident_id+'</span><span class="mono">姓名 '+(c.name_matched?'✓':'✗')+' · 电话 '+(c.phone_matched?'✓':'✗')+'</span><span class="sub">'+clean(c.stated_name)+' / '+clean(c.stated_phone||'未填')+'</span><span class="grow"></span><button class="btn btn-sm btn-primary" onclick="reviewClaim('+c.id+',true)">批准</button><button class="btn btn-sm btn-danger" onclick="reviewClaim('+c.id+',false)">拒绝</button></div>').join(''):'<div class="empty">暂无待核验申请</div>';
+  }catch(e){document.getElementById('claimQueue').innerHTML='<div class="empty">'+clean(e.message)+'</div>'}
+}
+async function reviewClaim(id,approve){
+  try{await api('/api/community/claim-requests/'+id+'/review','POST',{approve:approve,note:null});notify(approve?'已批准认领，居民即获档案归属':'已拒绝认领');loadClaims()}catch(e){notify(e.message)}
+}
+async function loadConsentReviews(){
+  try{
+    const list=await api('/api/community/consent-reviews');
+    document.getElementById('consentCount').textContent=list.length;
+    document.getElementById('consentQueue').innerHTML=list.length?list.map(ev=>'<div class="queue-item"><span class="mono">'+clean(ev.evidence_ref||'—')+'</span><span>档案 #'+ev.resident_id+' · '+(ev.granted?'授予同意':'撤回同意')+' · '+new Date(ev.created_at).toLocaleString('zh-CN')+'</span><span class="grow"></span><button class="btn btn-sm btn-primary" onclick="reviewConsentEvent('+ev.id+',true)">通过</button><button class="btn btn-sm btn-danger" onclick="reviewConsentEvent('+ev.id+',false)">驳回</button></div>').join(''):'<div class="empty">暂无待复核证据</div>';
+  }catch(e){document.getElementById('consentQueue').innerHTML='<div class="empty">'+clean(e.message)+'</div>'}
+}
+async function reviewConsentEvent(id,approve){
+  let note=null;
+  if(!approve){const inp=prompt('驳回原因（可留空）：');if(inp===null)return;if(inp)note=inp}
+  try{await api('/api/community/consent-events/'+id+'/review','POST',{approve:approve,note:note});notify(approve?'证据复核通过':'已驳回，员工对该居民的访问已切断');loadConsentReviews()}catch(e){notify(e.message)}
+}
+function renderVisitList(){
+  if(me.role!=='staff'){document.getElementById('visitList').innerHTML='<div class="empty">管理员不处理具体随访事项</div>';return}
+  document.getElementById('visitList').innerHTML=visits.map(v=>{const r=residents.find(x=>x.id===v.resident_id);return '<div class="visit"><div class="visit-date">'+clean(v.due_date.slice(5))+'</div><div class="visit-meta"><div class="visit-name">'+clean(r?.name||'居民档案 #'+v.resident_id)+'</div><div class="visit-desc">'+(v.status==='done'?'走访已完成':'计划走访 · 待完成')+'</div></div>'+(v.status==='done'?'<span class="tag">已完成</span>':'<button class="btn btn-sm btn-primary" onclick="finishVisit('+v.id+')">完成</button>')+'</div>'}).join('')||'<div class="empty">暂无随访任务，点击右上角「＋ 新建走访」</div>';
+}
+async function loadStats(){
+  const chips=document.getElementById('statChips'),chart=document.getElementById('statChart'),body=document.getElementById('latestBody');
+  if(me.role==='admin'){
+    try{
+      const sm=await api('/api/admin/summary');
+      chips.innerHTML=sm.communities.map(c=>'<section class="stat"><div class="stat-label">'+clean(c.name)+' <span class="chip">聚合</span></div><div class="value">'+c.active_resident_count+'</div><div class="foot">有效授权居民数</div></section>').join('');
+      chart.innerHTML='<div class="empty">管理员视图仅提供社区级聚合计数</div>';
+      body.innerHTML='<tr><td colspan="5" class="empty">管理员不读取个人明细</td></tr>';
+    }catch(e){notify(e.message)}
+    return;
+  }
+  try{
+    if(!residents.length)residents=await api('/api/community/residents?limit=100');
+    const totals={blood_pressure:0,blood_glucose:0,weight:0};const byDay={};const rows=[];
+    for(const r of residents){
+      try{
+        const vs=await api('/api/residents/'+r.id+'/vitals?limit=100');
+        let bp=null,glu=null,wt=null;
+        vs.forEach(v=>{const d=String(v.measured_at).slice(0,10);byDay[d]=(byDay[d]||0)+1;
+          if(v.type==='blood_pressure'){totals.blood_pressure++;if(!bp)bp=v}
+          if(v.type==='blood_glucose'){totals.blood_glucose++;if(!glu)glu=v}
+          if(v.type==='weight'){totals.weight++;if(!wt)wt=v}});
+        rows.push({name:r.name,bp:bp?bp.systolic+'/'+bp.diastolic+' mmHg':'—',glu:glu?glu.glucose_mmol_l+' mmol/L':'—',wt:wt?wt.weight_kg+' kg':'—',n:vs.length});
+      }catch(e){rows.push({name:r.name,bp:'—',glu:'—',wt:'—',n:0})}
+    }
+    chips.innerHTML=[['血压记录',totals.blood_pressure],['血糖记录',totals.blood_glucose],['体重记录',totals.weight]].map(kv=>'<section class="stat"><div class="stat-label">'+kv[0]+' <span class="chip">本社区</span></div><div class="value">'+kv[1]+'</div><div class="foot">全部授权居民的记录总数</div></section>').join('');
+    const days=[];for(let i=13;i>=0;i--){const d=new Date(Date.now()-i*86400000).toISOString().slice(0,10);days.push([d.slice(5),byDay[d]||0])}
+    const max=Math.max(1,...days.map(d=>d[1]));const bw=420/14;
+    chart.innerHTML='<svg class="statbar-svg" viewBox="0 0 420 156" role="img" aria-label="近14天测量次数柱状图">'+days.map((d,i)=>{const h=(118)*d[1]/max;const x=i*bw+8;return '<rect x="'+x+'" y="'+(140-Math.max(h,2))+'" width="'+(bw-14)+'" height="'+Math.max(h,2)+'" rx="4" fill="'+(i===13?'#F8533F':'#7A5CF0')+'" opacity="'+(i===13?1:.72)+'"></rect><text x="'+(x+(bw-14)/2)+'" y="153" font-size="9" fill="#8B929A" text-anchor="middle">'+d[0]+'</text>'+(d[1]?'<text x="'+(x+(bw-14)/2)+'" y="'+(132-h)+'" font-size="10" fill="#3A3C40" text-anchor="middle">'+d[1]+'</text>':'')}).join('')+'</svg>';
+    body.innerHTML=rows.map(r=>'<tr><td><span class="name-cell"><span class="avatar">'+clean(r.name.slice(0,1))+'</span>'+clean(r.name)+'</span></td><td>'+r.bp+'</td><td>'+r.glu+'</td><td>'+r.wt+'</td><td>'+r.n+'</td></tr>').join('')||'<tr><td colspan="5" class="empty">暂无数据</td></tr>';
+  }catch(e){notify(e.message)}
+}
+function renderSettings(){
+  const c=(me.community_id!=null)?('社区 #'+me.community_id):'—';
+  const role={staff:'社区工作人员',admin:'系统管理员',resident:'居民',family:'家庭成员'}[me.role]||me.role;
+  document.getElementById('acctInfo').innerHTML='<div><b>'+clean(me.display_name)+'</b>（@'+clean(me.username)+'）</div><div>角色：'+role+'</div><div>所属：'+c+'</div>';
+}
+async function changePassword(){
+  const cur=document.getElementById('pwCur').value,ne=document.getElementById('pwNew').value;
+  if(!cur||!ne){notify('请填写当前密码与新密码');return}
+  try{const out=await api('/api/auth/change-password','POST',{current_password:cur,new_password:ne});token=out.access_token;document.getElementById('pwCur').value='';document.getElementById('pwNew').value='';notify('密码已更新，其他设备已全部登出')}catch(e){notify('修改失败：'+e.message)}
+}
+async function setupMFA(){
+  try{
+    const out=await api('/api/auth/mfa/totp','POST');
+    const box=document.getElementById('mfaSecret');box.classList.remove('hidden');
+    box.innerHTML='<div class="helper">密钥仅本次显示，请用认证器 App 手动输入：</div><div class="mono" style="display:inline-block;margin:8px 0;font-size:14px;letter-spacing:1px">'+clean(out.secret)+'</div><div class="helper" style="word-break:break-all">'+clean(out.uri)+'</div>';
+    notify('请用认证器完成绑定，密钥仅显示一次');
+  }catch(e){notify(e.message)}
+}
+async function disableMFA(){
+  try{await api('/api/auth/mfa/totp','DELETE');notify('已关闭两步验证，会话已轮换，请重新登录');setTimeout(logout,1400)}catch(e){notify(e.message)}
+}
+async function logoutAllDevices(){
+  try{await api('/api/auth/logout-all','POST');notify('已在所有设备退出登录');setTimeout(logout,1000)}catch(e){notify(e.message)}
+}
+</script>
+<script>
 (function(){
   var box=document.getElementById('heroPulse');if(!box)return;
   var W=box.clientWidth||600,H=24,GRID=9.6,PS=5;
