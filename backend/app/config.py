@@ -18,6 +18,8 @@ class Settings:
     wechat_appid: str = os.getenv("WECHAT_APPID", "")
     wechat_appsecret: str = os.getenv("WECHAT_APPSECRET", "")
     cors_origins: tuple[str, ...] = tuple(x.strip() for x in os.getenv("CORS_ORIGINS", "").split(",") if x.strip())
+    # External asset origins allowed by the Content-Security-Policy (images/media), e.g. your CDN.
+    csp_asset_origins: tuple[str, ...] = tuple(x.strip() for x in os.getenv("ASSET_CSP_ORIGINS", "").split(",") if x.strip())
     # Comma-separated list of hosts that may reach a production deployment.
     allowed_hosts: tuple[str, ...] = tuple(x.strip() for x in os.getenv("ALLOWED_HOSTS", "").split(",") if x.strip())
     # Access-token lifetime; short-lived by design so a stolen bearer token ages out quickly.

@@ -105,8 +105,20 @@ tbody tr:last-child td{border:0}
 .acct b{font-weight:600}
 .btn-danger:hover{background:#FDF0EE}
 .statbar-svg{width:100%;height:auto;display:block}
+.hero-photo{position:relative;flex:none;height:150px;aspect-ratio:1208/1302;border-radius:16px;overflow:hidden;box-shadow:0 10px 26px rgba(23,52,44,.20)}
+.hero-photo img,.hero-photo video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.hero-photo video{left:-3.89%;width:107.78%;inset:auto;top:0;height:100%;opacity:0;transition:opacity .8s ease}
+.hero-photo video.on{opacity:1}
+.stat.peony{position:relative;overflow:hidden}
+.stat.peony>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.stat.peony .peony-card{position:relative;background:rgba(255,255,255,.80);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:14px;padding:14px 16px;margin:2px}
+.visit-banner{position:relative;height:112px;border-radius:16px;overflow:hidden;margin-bottom:18px}
+.visit-banner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.visit-banner-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(18,40,34,.60),rgba(18,40,34,.10) 62%)}
+.visit-banner-text{position:absolute;left:26px;bottom:18px;color:#fff;font-size:18px;font-weight:600;letter-spacing:.01em;text-shadow:0 2px 10px rgba(0,0,0,.25)}
+@media (prefers-reduced-motion:reduce){.hero-photo video{display:none}}
 @media(max-width:1050px){.settings-grid{grid-template-columns:1fr}.view-head{flex-wrap:wrap}}
-@media(max-width:1050px){.layout{grid-template-columns:1fr}.side{display:none}.main{padding:25px 22px}.content-grid{grid-template-columns:1fr}}
+@media(max-width:1050px){.hero-photo{display:none}.layout{grid-template-columns:1fr}.side{display:none}.main{padding:25px 22px}.content-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.grid{grid-template-columns:1fr}.hero{padding:24px 20px 40px}.hero-icon{display:none}.page-title{font-size:27px}.pill{display:none}.panel{padding:22px 17px}.main{padding:20px 14px}}
 </style></head><body>
 <div class="topbar">演示页面 · 所有数据均为虚构示例 · 本产品为非诊断的健康记录与随访协同试点工具</div>
@@ -114,8 +126,8 @@ tbody tr:last-child td{border:0}
 <main class="main">
 <section class="view" id="view-overview">
 <div class="top"><div><div class="eyebrow">COMMUNITY HEALTH CENTER</div><h1 class="page-title">社区健康工作台</h1><div class="sub" id="greet">让每一份健康关怀，都有迹可循。</div></div><div class="topright"><span class="pill">仅限授权工作人员</span><span class="profile-dot" id="avatar">安</span><button class="btn btn-sm" onclick="logout()">退出</button></div></div>
-<section class="hero"><div><h2>用更有温度的方式，做好每一次社区关怀。</h2><p>集中管理居民健康档案、日常测量与线下随访。问卷敏感答案不对社区工作人员展示；无有效授权的居民数据不可访问。</p></div><div class="hero-icon">✳</div><div class="hero-pulse" id="heroPulse" aria-hidden="true"></div></section>
-<div class="grid"><section class="stat"><div class="stat-label">管理中的居民 <span class="chip">已取得授权</span></div><div id="residentCount" class="value">—</div><div class="foot">当前社区的有效居民档案</div></section><section class="stat"><div class="stat-label">待完成走访 <span class="chip">工作提醒</span></div><div class="value" id="visitCount">—</div><div class="foot">需要跟进的社区服务任务</div></section><section class="stat"><div class="stat-label">今日日期 <span class="chip">本地时间</span></div><div class="value" style="font-size:27px;margin-top:21px" id="today">—</div><div class="foot">近期重点：居民授权与随访服务</div></section></div>
+<section class="hero"><div><h2>用更有温度的方式，做好每一次社区关怀。</h2><p>集中管理居民健康档案、日常测量与线下随访。问卷敏感答案不对社区工作人员展示；无有效授权的居民数据不可访问。</p></div><div class="hero-photo"><img src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/c43c6772-ae79-45f3-a2ff-90a401f03b48.webp" alt="开怀大笑的社区居民" onerror="this.remove()"><video id="heroVideo" muted loop playsinline autoplay preload="metadata" src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/39c69b84-0ac5-485f-ae42-3bd7d521989e.mp4"></video></div><div class="hero-pulse" id="heroPulse" aria-hidden="true"></div></section>
+<div class="grid"><section class="stat"><div class="stat-label">管理中的居民 <span class="chip">已取得授权</span></div><div id="residentCount" class="value">—</div><div class="foot">当前社区的有效居民档案</div></section><section class="stat"><div class="stat-label">待完成走访 <span class="chip">工作提醒</span></div><div class="value" id="visitCount">—</div><div class="foot">需要跟进的社区服务任务</div></section><section class="stat peony"><img src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/b6730025-6d74-465e-8978-f9909c47095a.webp" alt="" loading="lazy" onerror="this.remove()"><div class="peony-card"><div class="stat-label">今日日期 <span class="chip">本地时间</span></div><div class="value" style="font-size:27px;margin-top:12px" id="today">—</div><div class="foot">近期重点：居民授权与随访服务</div></div></section></div>
 <div class="content-grid"><section class="panel"><div class="panel-head"><div><h3>居民健康档案</h3><div class="sub" style="margin-top:6px">仅显示当前社区且授权有效的居民</div></div><button class="btn btn-primary" id="newResident" onclick="showCreate()">＋ 登记居民</button></div><div class="field"><input id="search" placeholder="按姓名搜索居民" oninput="renderResidents()" /></div><div class="tablewrap"><table><thead><tr><th>居民姓名</th><th>出生年份</th><th>登记方式</th><th>知情同意</th><th>操作</th></tr></thead><tbody id="residentRows"><tr><td colspan="5">正在读取...</td></tr></tbody></table></div></section>
 <section class="panel"><div class="panel-head"><div><h3>随访任务</h3><div class="sub" style="margin-top:6px">线下工作闭环</div></div><button class="btn" onclick="showVisit()">＋ 新建</button></div><div id="visitRows"><div class="empty">正在读取...</div></div></section></div>
 </section>
@@ -129,7 +141,7 @@ tbody tr:last-child td{border:0}
 
 <section class="view hidden" id="view-visits">
  <div class="view-head"><div><h2 class="view-title">入户随访管理</h2><div class="sub">计划、完成与记录留痕</div></div><button class="btn btn-primary" onclick="showVisit()">＋ 新建走访</button></div>
- <div class="panel"><div id="visitList" class="empty">正在读取...</div></div>
+ <div class="visit-banner"><img src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/b6730025-6d74-465e-8978-f9909c47095a.webp" alt="" loading="lazy" onerror="this.remove()"><div class="visit-banner-shade"></div><div class="visit-banner-text">线下走访 · 让每一份关怀都有迹可循</div></div><div class="panel"><div id="visitList" class="empty">正在读取...</div></div>
 </section>
 
 <section class="view hidden" id="view-stats">
@@ -291,6 +303,15 @@ async function disableMFA(){
 async function logoutAllDevices(){
   try{await api('/api/auth/logout-all','POST');notify('已在所有设备退出登录');setTimeout(logout,1000)}catch(e){notify(e.message)}
 }
+</script>
+<script>
+(function(){
+  var v=document.getElementById('heroVideo');if(!v)return;
+  var reduced=false;try{reduced=matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){}
+  if(reduced){v.remove();return}
+  v.addEventListener('playing',function(){v.classList.add('on')});
+  var p=v.play&&v.play();if(p&&p.catch)p.catch(function(){});
+})();
 </script>
 <script>
 (function(){
