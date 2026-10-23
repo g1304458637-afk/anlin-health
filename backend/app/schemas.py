@@ -181,9 +181,13 @@ class VitalIn(Model):
     glucose_mmol_l: float | None = None
     weight_kg: float | None = None
     measured_at: datetime | None = None
+    measurement_context: Literal["fasting", "before_meal", "after_meal", "unknown"] | None = None
+    client_request_id: str | None = Field(default=None, min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
 
     @model_validator(mode="after")
     def validate_values(self):
+        if self.measurement_context and self.type != "blood_glucose":
+            raise ValueError("进餐相关说明仅适用于血糖记录")
         if self.type == "blood_pressure":
             if self.systolic is None or self.diastolic is None or not 40 <= self.systolic <= 300 or not 20 <= self.diastolic <= 200 or self.systolic <= self.diastolic:
                 raise ValueError("血压必须填写合理范围的收缩压与舒张压")
@@ -211,6 +215,7 @@ class VitalOut(Model):
     glucose_mmol_l: float | None
     weight_kg: float | None
     measured_at: datetime
+    measurement_context: str | None = None
 
 
 class QuestionnaireOut(Model):

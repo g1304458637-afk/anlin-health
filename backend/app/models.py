@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, date
-from sqlalchemy import String, Integer, Boolean, DateTime, Date, ForeignKey, JSON, Text, Float, Index
+from sqlalchemy import String, Integer, Boolean, DateTime, Date, ForeignKey, JSON, Text, Float, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .crypto import EncryptedString
 from .db import Base
@@ -105,6 +105,7 @@ class FamilyGrant(Base):
 
 class Vital(Base):
     __tablename__ = "vitals"
+    __table_args__ = (UniqueConstraint("resident_id", "actor_id", "client_request_id", name="uq_vital_client_request"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     resident_id: Mapped[int] = mapped_column(ForeignKey("residents.id"), index=True)
     type: Mapped[str] = mapped_column(String(32))
@@ -112,6 +113,8 @@ class Vital(Base):
     diastolic: Mapped[int | None] = mapped_column(Integer, nullable=True)
     glucose_mmol_l: Mapped[float | None] = mapped_column(Float, nullable=True)
     weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    measurement_context: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    client_request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -175,3 +178,4 @@ Index("ix_family_active", FamilyGrant.resident_id, FamilyGrant.grantee_id)
 
 # Register private report tables for create_all and Alembic metadata discovery.
 from .report_models import MedicalReport, ReportVitalLink  # noqa: E402,F401
+from .plan_models import HealthPlan, PlanOccurrence  # noqa: E402,F401

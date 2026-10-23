@@ -129,13 +129,13 @@ tbody tr:last-child td{border:0}
 @media(max-width:1050px){.settings-grid{grid-template-columns:1fr}.view-head{flex-wrap:wrap}}
 @media(max-width:1050px){.hero-photo{display:none}.layout{display:block}.side{display:flex;position:sticky;top:0;z-index:12;padding:12px 16px;gap:10px;border-right:0;border-bottom:1px solid var(--border)}.side .brandmark{width:30px;height:30px;font-size:15px;border-radius:9px}.side .brand{font-size:15px}.side .brand small,.side-foot{display:none}.side .nav{display:flex;overflow-x:auto;gap:6px}.side .nav>div{flex-shrink:0;white-space:nowrap;padding:9px 12px;font-size:13px}.main{padding:25px 22px}.content-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.grid{grid-template-columns:1fr}.hero{padding:24px 20px 40px}.hero-icon{display:none}.page-title{font-size:27px}.pill{display:none}.panel{padding:22px 17px}.main{padding:20px 14px}}
-</style></head><body>
+</style><link rel="stylesheet" href="/static/care-theme.css"></head><body class="community-app">
 <div class="topbar">演示页面 · 所有数据均为虚构示例 · 本产品为非诊断的健康记录与随访协同试点工具</div>
 <div class="layout"><aside class="side"><div class="brand"><span class="brandmark">安</span><span>安邻健康<small>COMMUNITY CARE</small></span></div><div class="nav" id="sideNav"><div class="active" data-view="overview" onclick="switchView('overview')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchView('overview')}">◈ &nbsp; 工作概览</div><div data-view="residents" onclick="switchView('residents')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchView('residents')}">☰ &nbsp; 居民健康档案</div><div data-view="visits" onclick="switchView('visits')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchView('visits')}">◷ &nbsp; 入户随访管理</div><div data-view="stats" onclick="switchView('stats')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchView('stats')}">◎ &nbsp; 健康数据统计</div><div data-view="settings" onclick="switchView('settings')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchView('settings')}">⚙ &nbsp; 安全与设置</div></div><div class="side-foot">数字化社区健康关怀<br>演示环境 · 不可用于真实医疗诊断</div></aside>
 <main class="main">
 <section class="view" id="view-overview">
 <div class="top"><div><div class="eyebrow">COMMUNITY HEALTH CENTER</div><h1 class="page-title">社区健康工作台</h1><div class="sub" id="greet">让每一份健康关怀，都有迹可循。</div></div><div class="topright"><span class="pill">仅限授权工作人员</span><span class="profile-dot" id="avatar">安</span><button class="btn btn-sm" onclick="logout()">退出</button></div></div>
-<section class="hero"><img class="hero-bg" src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/b6730025-6d74-465e-8978-f9909c47095a.webp" alt="" onerror="this.remove()"><div class="hero-shade"></div><div class="hero-glass"><h2>用更有温度的方式，做好每一次社区关怀。</h2><p>集中管理居民健康档案、日常测量与线下随访。问卷敏感答案不对社区工作人员展示；无有效授权的居民数据不可访问。</p></div><div class="hero-photo"><img src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/c43c6772-ae79-45f3-a2ff-90a401f03b48.webp" alt="开怀大笑的社区居民" onerror="this.remove()"><video id="heroVideo" muted loop playsinline autoplay preload="metadata" src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/39c69b84-0ac5-485f-ae42-3bd7d521989e.mp4"></video></div><div class="hero-pulse" id="heroPulse" aria-hidden="true"></div></section>
+<section class="hero"><div class="hero-glass"><div class="page-kicker">CARE, EVERY DAY</div><h2>把每一份关怀，<br>落在日常里。</h2><p>健康记录、居民授权与随访安排，<br>在这里有序衔接。</p></div><img class="hero-garden" src="/static/care-garden.svg" alt=""></section>
 <div class="grid"><section class="stat"><div class="stat-label">管理中的居民 <span class="chip">已取得授权</span></div><div id="residentCount" class="value">—</div><div class="foot">当前社区的有效居民档案</div></section><section class="stat"><div class="stat-label">待完成走访 <span class="chip">工作提醒</span></div><div class="value" id="visitCount">—</div><div class="foot">需要跟进的社区服务任务</div></section><section class="stat"><div class="stat-label">今日日期 <span class="chip">本地时间</span></div><div class="value" style="font-size:27px;margin-top:21px" id="today">—</div><div class="foot">近期重点：居民授权与随访服务</div></section></div>
 <div class="content-grid"><section class="panel"><div class="panel-head"><div><h3>居民健康档案</h3><div class="sub" style="margin-top:6px">仅显示当前社区且授权有效的居民</div></div><button class="btn btn-primary" id="newResident" onclick="showCreate()">＋ 登记居民</button></div><div class="field"><input id="search" placeholder="按姓名搜索居民" oninput="searchResidents(this.value)" /></div><div class="tablewrap"><table><thead><tr><th>居民姓名</th><th>出生年份</th><th>登记方式</th><th>知情同意</th><th>操作</th></tr></thead><tbody id="residentRows"><tr><td colspan="5">正在读取...</td></tr></tbody></table></div></section>
 <section class="panel"><div class="panel-head"><div><h3>随访任务</h3><div class="sub" style="margin-top:6px">线下工作闭环</div></div><button class="btn" onclick="showVisit()">＋ 新建</button></div><div id="visitRows"><div class="empty">正在读取...</div></div></section></div>
@@ -150,7 +150,8 @@ tbody tr:last-child td{border:0}
 
 <section class="view hidden" id="view-visits">
  <div class="view-head"><div><h2 class="view-title">入户随访管理</h2><div class="sub">计划、完成与记录留痕</div></div><button class="btn btn-primary" onclick="showVisit()">＋ 新建走访</button></div>
- <div class="visit-banner"><img src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/b6730025-6d74-465e-8978-f9909c47095a.webp" alt="" loading="lazy" onerror="this.remove()"><div class="visit-banner-shade"></div><div class="visit-banner-text">线下走访 · 让每一份关怀都有迹可循</div></div><div class="panel"><div id="visitList" class="empty">正在读取...</div></div>
+ <div class="visit-banner"><div class="visit-banner-text">线下走访 · 让每一份关怀都有迹可循</div></div>
+ <div class="panel"><div class="visit-tools"><label for="visitStatus">任务状态 <select id="visitStatus"><option value="planned">待完成</option><option value="done">已完成</option><option value="all">全部任务</option></select></label><span id="visitSummary" class="sub" aria-live="polite">正在读取...</span></div><div id="visitList" class="empty" aria-live="polite">正在读取...</div><div class="visit-pagination" id="visitPaging"><button class="btn btn-sm" id="visitPrev" type="button" disabled>上一页</button><span id="visitPageLabel">第 1 页</span><button class="btn btn-sm" id="visitNext" type="button" disabled>下一页</button></div></div>
 </section>
 
 <section class="view hidden" id="view-stats">
@@ -179,6 +180,7 @@ tbody tr:last-child td{border:0}
 <div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()"><div class="modal"><h3 id="modalTitle">操作</h3><div class="sub" id="modalDesc"></div><form id="modalForm"><div id="modalFields"></div><footer><button type="button" class="btn" onclick="closeModal()">取消</button><button type="submit" class="btn btn-primary" id="modalSubmit">确认</button></footer></form></div></div><div id="toast" class="toast hidden"></div>
 <script>
 let token='',me=null,residents=[],visits=[],residentOffset=0,residentHasMore=false,residentQuery='',residentSearchTimer=null,statsOffset=0,statsQuery='',statsSearchTimer=null,sessionVersion=0,residentRequestSeq=0,statsRequestSeq=0,loginBusy=false;
+let visitItems=[],visitOffset=0,visitFilter='planned',visitTotal=0,visitRequestSeq=0,visitStatsRequestSeq=0,visitLoading=false,visitTotals={total:0,planned:0,done:0,overdue:0};
 window.anlinAssistantAuth=()=>({token,user:me});
 function sessionChanged(){sessionVersion++;window.dispatchEvent(new CustomEvent('anlin-session-change'))}
 const $=x=>document.getElementById(x); const clean=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -187,8 +189,37 @@ function notify(text){$('toast').textContent=text;$('toast').classList.remove('h
 async function api(path,method='GET',data){const requestVersion=sessionVersion;const res=await fetch(path,{method,signal:AbortSignal.timeout(15000),headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined});if(requestVersion!==sessionVersion)throw new Error('会话已切换');if(res.status===401){logout();throw new Error('登录已失效，请重新登录')}if(res.status===204)return null;let body={};try{body=await res.json()}catch{}if(requestVersion!==sessionVersion)throw new Error('会话已切换');if(!res.ok)throw new Error(typeof body.detail==='string'?body.detail:JSON.stringify(body.detail||'操作失败'));return body}
 async function login(totpCode){if(loginBusy&&!totpCode)return;if(!totpCode)loginBusy=true;try{const path=totpCode?'/api/auth/login/totp':'/api/auth/login';const payload=totpCode?{username:$('username').value.trim(),password:$('password').value,totp_code:totpCode}:{username:$('username').value.trim(),password:$('password').value};const out=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const body=await out.json().catch(()=>({}));if(out.status===401&&out.headers.get('X-MFA-Required')==='totp'){const code=prompt('此账号已开启两步验证，请输入认证器中的6位验证码：');if(code)await login(code.trim());return}if(!out.ok)throw new Error(typeof body.detail==='string'?body.detail:'登录失败');if(!['staff','admin'].includes(body.user?.role))throw new Error('此入口仅供社区工作人员或管理员使用，居民和家属请使用居民服务入口');logout();token=body.access_token;me=body.user;sessionChanged();$('loginShade').classList.add('hidden');$('greet').textContent=me.display_name+'，欢迎回到工作台。';$('avatar').textContent=(me.display_name||'安').slice(-1);await refresh()}catch(e){notify('登录失败：'+e.message)}finally{if(!totpCode)loginBusy=false}}
 (async()=>{try{const s=await(await fetch('/api/auth/demo-status')).json();if(s.enabled){$('demoHint').classList.remove('hidden');$('username').value='staff'}}catch{}})()
-function logout(){token='';me=null;residents=[];visits=[];residentOffset=0;residentHasMore=false;residentQuery='';statsOffset=0;statsQuery='';residentRequestSeq++;statsRequestSeq++;clearTimeout(residentSearchTimer);clearTimeout(statsSearchTimer);sessionChanged();clearAdminAccounts();closeModal();$('modalFields').replaceChildren();$('modalTitle').textContent='操作';$('modalDesc').textContent='';$('toast').textContent='';$('toast').classList.add('hidden');$('loginShade').classList.remove('hidden');$('username').value='';$('password').value='';$('pwCur').value='';$('pwNew').value='';$('mfaPassword').value='';$('mfaExistingCode').value='';$('mfaSecret').replaceChildren();$('mfaSecret').classList.add('hidden');$('search').value='';$('search2').value='';$('statsSearch').value='';$('newResident').disabled=false;$('provisionResidentView').disabled=false;$('createResidentView').disabled=false;for(const id of ['residentCount','visitCount','greet','avatar','claimCount','consentCount','acctInfo'])$(id).textContent='—';for(const id of ['residentRows','residentTable2','visitRows','visitList','claimQueue','consentQueue','residentPaging','statsPaging','statChips','statChart','latestBody'])$(id).replaceChildren();currentView='overview';document.querySelectorAll('#sideNav > div').forEach(el=>el.classList.toggle('active',el.dataset.view==='overview'));document.querySelectorAll('.view').forEach(el=>el.classList.toggle('hidden',el.id!=='view-overview'))}
-async function refresh(){const requestSeq=++residentRequestSeq,version=sessionVersion;try{if(!me)return;if(me.role==='admin'){residents=[];visits=[];const s=await api('/api/admin/summary');if(version!==sessionVersion||requestSeq!==residentRequestSeq)return;$('residentCount').textContent=s.communities.reduce((a,c)=>a+c.active_resident_count,0);$('visitCount').textContent='—';$('residentRows').innerHTML='<tr><td colspan="5">管理员仅能查看聚合指标；居民个人信息不在此处显示。</td></tr>';$('visitRows').innerHTML='<div class="empty">管理员不处理具体随访事项</div>';$('newResident').disabled=true;$('provisionResidentView').disabled=true;$('createResidentView').disabled=true;return}$('newResident').disabled=false;$('provisionResidentView').disabled=false;$('createResidentView').disabled=false;const [rs,vs,stats]=await Promise.all([api('/api/community/residents?limit=50&offset='+residentOffset+'&q='+encodeURIComponent(residentQuery)),api('/api/community/visits'),api('/api/community/stats')]);if(requestSeq!==residentRequestSeq)return;residents=rs;residentHasMore=rs.length===50;visits=vs;$('residentCount').textContent=stats.resident_count;$('visitCount').textContent=vs.filter(v=>v.status!=='done').length;renderResidents();renderResidentsTable();renderVisits();if(currentView==='stats')loadStats()}catch(e){if(e.message!=='会话已切换')notify(e.message)}}
+function logout(){token='';me=null;residents=[];visits=[];residentOffset=0;residentHasMore=false;residentQuery='';statsOffset=0;statsQuery='';residentRequestSeq++;statsRequestSeq++;visitRequestSeq++;visitStatsRequestSeq++;visitItems=[];visitOffset=0;visitFilter='planned';visitTotal=0;visitLoading=false;visitTotals={total:0,planned:0,done:0,overdue:0};$('visitStatus').value='planned';$('visitStatus').disabled=false;$('visitSummary').textContent='';$('visitPageLabel').textContent='第 1 页';$('visitPrev').disabled=true;$('visitNext').disabled=true;clearTimeout(residentSearchTimer);clearTimeout(statsSearchTimer);sessionChanged();clearAdminAccounts();closeModal();$('modalFields').replaceChildren();$('modalTitle').textContent='操作';$('modalDesc').textContent='';$('toast').textContent='';$('toast').classList.add('hidden');$('loginShade').classList.remove('hidden');$('username').value='';$('password').value='';$('pwCur').value='';$('pwNew').value='';$('mfaPassword').value='';$('mfaExistingCode').value='';$('mfaSecret').replaceChildren();$('mfaSecret').classList.add('hidden');$('search').value='';$('search2').value='';$('statsSearch').value='';$('newResident').disabled=false;$('provisionResidentView').disabled=false;$('createResidentView').disabled=false;for(const id of ['residentCount','visitCount','greet','avatar','claimCount','consentCount','acctInfo'])$(id).textContent='—';for(const id of ['residentRows','residentTable2','visitRows','visitList','claimQueue','consentQueue','residentPaging','statsPaging','statChips','statChart','latestBody'])$(id).replaceChildren();currentView='overview';document.querySelectorAll('#sideNav > div').forEach(el=>el.classList.toggle('active',el.dataset.view==='overview'));document.querySelectorAll('.view').forEach(el=>el.classList.toggle('hidden',el.id!=='view-overview'))}
+async function refresh(){
+  const requestSeq=++residentRequestSeq,version=sessionVersion;
+  try{
+    if(!me)return;
+    if(me.role==='admin'){
+      residents=[];visits=[];
+      const s=await api('/api/admin/summary');
+      if(version!==sessionVersion||requestSeq!==residentRequestSeq)return;
+      $('residentCount').textContent=s.communities.reduce((a,c)=>a+c.active_resident_count,0);
+      $('visitCount').textContent='—';
+      $('residentRows').innerHTML='<tr><td colspan="5">管理员仅能查看聚合指标；居民个人信息不在此处显示。</td></tr>';
+      $('visitRows').innerHTML='<div class="empty">管理员不处理具体随访事项</div>';
+      $('newResident').disabled=true;$('provisionResidentView').disabled=true;$('createResidentView').disabled=true;return;
+    }
+    $('newResident').disabled=false;$('provisionResidentView').disabled=false;$('createResidentView').disabled=false;
+    const visitStatsSeq=++visitStatsRequestSeq;
+    const [rs,vs,stats,visitStats]=await Promise.all([
+      api('/api/community/residents?limit=50&offset='+residentOffset+'&q='+encodeURIComponent(residentQuery)),
+      api('/api/community/visits?status=planned&limit=8&offset=0'),
+      api('/api/community/stats'),api('/api/community/visits/stats')
+    ]);
+    if(version!==sessionVersion||requestSeq!==residentRequestSeq)return;
+    residents=rs;residentHasMore=rs.length===50;visits=vs;
+    $('residentCount').textContent=stats.resident_count;
+    if(visitStatsSeq===visitStatsRequestSeq)applyVisitStats(visitStats);
+    renderResidents();renderResidentsTable();renderVisits();
+    if(currentView==='stats')loadStats();
+    if(currentView==='visits')await loadVisitList();
+  }catch(e){if(version===sessionVersion&&requestSeq===residentRequestSeq&&e.message!=='会话已切换')notify(e.message)}
+}
 $('today').textContent=new Date().toLocaleDateString('zh-CN',{month:'2-digit',day:'2-digit'});
 function openStaffReport(id){if(me?.role!=='staff')return;const r=residents.find(x=>x.id===id&&x.consent_active);if(!r)return notify('请先选择已授权的居民');window.anlinReports?.open(r.id,r.name)}
 function renderResidents(){if(!me||me.role!=='staff')return;$('residentRows').innerHTML=residents.map(r=>`<tr><td><span class="name-cell"><span class="avatar">${clean(r.name.slice(0,1))}</span>${clean(r.name)}</span></td><td>${r.birth_year}</td><td>${r.owner_user_id?'自主建档':'协助登记'}</td><td><span class="tag">${r.consent_active?'已授权':'未生效'}</span></td><td><button class="btn btn-sm" onclick="showVital(${r.id})">＋ 记录指标</button> <button class="btn btn-sm" onclick="openStaffReport(${r.id})">报告导入</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">没有符合条件的居民</td></tr>'}
@@ -198,7 +229,25 @@ function closeModal(){$('overlay').style.display='none';$('modalForm').onsubmit=
 let fieldSeq=0;function field(label,name,type='text',extra=''){const id='f_'+(++fieldSeq);return `<div class="field"><label for="${id}">${label}</label><input id="${id}" name="${name}" type="${type}" required ${extra}></div>`}
 function showCreate(){if(me?.role!=='staff')return;modal('登记线下居民档案','只有在取得居民明确知情同意、并有可追溯线下证据时，才能协助建档。纸质同意需由另一名工作人员复核后才能访问档案。',field('居民姓名','name')+field('出生年份','birth_year','number','min="1900" max="2100"')+field('联系电话','phone','tel','required')+field('线下知情同意记录编号','evidence_ref','text','minlength="5" placeholder="例如 PAPER-2026-001"')+'<label class="checkbox"><input name="consent" type="checkbox" required>我确认已取得居民的明确知情同意，并已经按机构制度留存证明。</label>',async d=>{await api('/api/community/residents','POST',{name:d.get('name').trim(),birth_year:Number(d.get('birth_year')),phone:d.get('phone').trim(),community_id:me.community_id,sex:'undisclosed',consent_confirmed:d.has('consent'),evidence_ref:d.get('evidence_ref').trim()})})}
 function showProvision(){if(me?.role!=='staff')return;modal('开通居民登录账号','仅创建登录账号。若社区已有线下档案，居民登录后可申请现场核验认领；不要重复登记档案。',field('登录账号','username','text','minlength="4" maxlength="40" autocomplete="off"')+field('居民称呼','display_name')+field('初始密码','initial_password','password','minlength="10" autocomplete="new-password"'),async d=>{await api('/api/community/accounts','POST',{username:d.get('username').trim(),display_name:d.get('display_name').trim(),initial_password:d.get('initial_password')})})}
-function showVital(id){const r=residents.find(x=>x.id===id);modal('记录健康指标','为 '+(r?.name||'居民')+' 手动录入数据。此记录不属于医疗诊断。','<div class="field"><label>指标类型</label><select name="type" id="metricType" onchange="renderMetricFields()"><option value="blood_pressure">血压（mmHg）</option><option value="blood_glucose">血糖（mmol/L）</option><option value="weight">体重（kg）</option></select></div><div id="metricFields"></div>',async d=>{const type=d.get('type');let payload={type};if(type==='blood_pressure'){payload.systolic=Number(d.get('systolic'));payload.diastolic=Number(d.get('diastolic'))}if(type==='blood_glucose')payload.glucose_mmol_l=Number(d.get('glucose'));if(type==='weight')payload.weight_kg=Number(d.get('weight'));await api(`/api/residents/${id}/vitals`,'POST',payload)});renderMetricFields()}
+function localDateTimeValue(date=new Date()){
+  return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
+}
+function showVital(id){
+  if(me?.role!=='staff')return;
+  const r=residents.find(x=>x.id===id),localNow=localDateTimeValue();
+  modal('记录健康指标','为 '+(r?.name||'居民')+' 手动录入数据。请填写实际测量时间（当前设备时区），此记录不属于医疗诊断。',
+    '<div class="field"><label for="metricType">指标类型</label><select name="type" id="metricType"><option value="blood_pressure">血压（mmHg）</option><option value="blood_glucose">血糖（mmol/L）</option><option value="weight">体重（kg）</option></select></div><div id="metricFields"></div>'+field('实际测量时间','measured_at','datetime-local','value="'+localNow+'" max="'+localNow+'"'),async d=>{
+      const measured=new Date(d.get('measured_at'));
+      if(!d.get('measured_at')||Number.isNaN(measured.getTime()))throw new Error('请填写有效的实际测量时间');
+      if(measured.getTime()>Date.now()+60000)throw new Error('实际测量时间不能晚于现在');
+      const type=d.get('type'),payload={type,measured_at:measured.toISOString()};
+      if(type==='blood_pressure'){payload.systolic=Number(d.get('systolic'));payload.diastolic=Number(d.get('diastolic'))}
+      if(type==='blood_glucose')payload.glucose_mmol_l=Number(d.get('glucose'));
+      if(type==='weight')payload.weight_kg=Number(d.get('weight'));
+      await api(`/api/residents/${id}/vitals`,'POST',payload);
+    });
+  $('metricType').addEventListener('change',renderMetricFields);renderMetricFields();
+}
 function renderMetricFields(){const t=$('metricType')?.value;if(!$('metricFields'))return;$('metricFields').innerHTML=t==='blood_pressure'?field('收缩压','systolic','number','min="40" max="300"')+field('舒张压','diastolic','number','min="20" max="200"'):t==='blood_glucose'?field('血糖 mmol/L','glucose','number','step="0.1" min="0.5" max="50"'):field('体重 kg','weight','number','step="0.1" min="5" max="400"')}
 function showVisit(){if(me?.role!=='staff')return notify('管理员不处理随访');if(!residents.length)return notify('请先登记居民');let opts=residents.map(r=>`<option value="${r.id}">${clean(r.name)}</option>`).join('');modal('新增线下随访','为居民安排一次社区走访。','<div class="field"><label>居民</label><select name="resident_id">'+opts+'</select></div>'+field('走访日期','due_date','date')+'<div class="field"><label>工作备注（选填）</label><textarea name="note" maxlength="500" rows="3"></textarea></div>',async d=>{await api('/api/community/visits','POST',{resident_id:Number(d.get('resident_id')),due_date:d.get('due_date'),note:d.get('note')||null})})}
 async function finishVisit(id){if(!confirm('确认已完成本次走访？'))return;try{await api('/api/community/visits/'+id+'/finish','PATCH',{note:'线下走访已完成'});await refresh();notify('已标记完成')}catch(e){notify(e.message)}}
@@ -211,11 +260,12 @@ function switchView(v){
     for(const id of ['pwCur','pwNew','mfaPassword','mfaExistingCode'])$(id).value='';
     $('mfaSecret').replaceChildren();$('mfaSecret').classList.add('hidden');
   }
+  if(currentView==='visits'&&v!=='visits'){visitRequestSeq++;visitLoading=false}
   currentView=v;
   document.querySelectorAll('#sideNav > div').forEach(function(el){el.classList.toggle('active',el.dataset.view===v)});
   document.querySelectorAll('.view').forEach(function(el){el.classList.toggle('hidden',el.id!=='view-'+v)});
   if(v==='residents')loadResidentsView();
-  if(v==='visits')renderVisitList();
+  if(v==='visits')loadVisitList();
   if(v==='stats')loadStats();
   if(v==='settings')renderSettings();
 }
@@ -278,10 +328,56 @@ async function reviewConsentEvent(id,approve){
   if(!approve){const inp=prompt('驳回原因（可留空）：');if(inp===null)return;if(inp)note=inp}
   try{await api('/api/community/consent-events/'+id+'/review','POST',{approve:approve,note:note});notify(approve?'证据复核通过':'已驳回');await refresh();await loadConsentReviews()}catch(e){notify(e.message)}
 }
-function renderVisitList(){
-  if(me.role!=='staff'){document.getElementById('visitList').innerHTML='<div class="empty">管理员不处理具体随访事项</div>';return}
-  document.getElementById('visitList').innerHTML=visits.map(v=>{const r=residents.find(x=>x.id===v.resident_id);return '<div class="visit"><div class="visit-date">'+clean(v.due_date.slice(5))+'</div><div class="visit-meta"><div class="visit-name">'+clean(r?.name||'居民档案 #'+v.resident_id)+'</div><div class="visit-desc">'+(v.status==='done'?'走访已完成':'计划走访 · 待完成')+'</div></div>'+(v.status==='done'?'<span class="tag">已完成</span>':'<button class="btn btn-sm btn-primary" onclick="finishVisit('+v.id+')">完成</button>')+'</div>'}).join('')||'<div class="empty">暂无随访任务，点击右上角「＋ 新建走访」</div>';
+function applyVisitStats(stats){
+  visitTotals=stats;$('visitCount').textContent=stats.planned;
+  $('visitSummary').textContent='待完成 '+stats.planned+' · 已完成 '+stats.done+' · 逾期 '+stats.overdue;
 }
+function renderVisitList(){
+  $('visitList').innerHTML=visitItems.map(v=>{
+    const r=residents.find(x=>x.id===v.resident_id);
+    return '<div class="visit"><div class="visit-date">'+clean(v.due_date.slice(5))+'</div><div class="visit-meta"><div class="visit-name">'+clean(r?.name||'居民档案 #'+v.resident_id)+'</div><div class="visit-desc">'+(v.status==='done'?'走访已完成':'计划走访 · 待完成')+'</div></div>'+(v.status==='done'?'<span class="tag">已完成</span>':'<button class="btn btn-sm btn-primary" onclick="finishVisit('+v.id+')">完成</button>')+'</div>';
+  }).join('')||'<div class="empty">当前状态下暂无随访任务</div>';
+  $('visitPageLabel').textContent='第 '+(Math.floor(visitOffset/25)+1)+' / '+Math.max(1,Math.ceil(visitTotal/25))+' 页 · 共 '+visitTotal+' 项';
+  $('visitPrev').disabled=visitLoading||visitOffset===0;
+  $('visitNext').disabled=visitLoading||visitOffset+25>=visitTotal;
+}
+async function loadVisitList(){
+  if(!me)return;
+  if(me.role!=='staff'){
+    $('visitList').innerHTML='<div class="empty">管理员不处理具体随访事项</div>';
+    $('visitStatus').disabled=true;$('visitSummary').textContent='';$('visitPageLabel').textContent='';
+    $('visitPrev').disabled=true;$('visitNext').disabled=true;return;
+  }
+  const requestSeq=++visitRequestSeq,statsSeq=++visitStatsRequestSeq,version=sessionVersion,filter=visitFilter,offset=visitOffset;
+  visitLoading=true;$('visitStatus').disabled=false;$('visitPrev').disabled=true;$('visitNext').disabled=true;
+  $('visitList').innerHTML='<div class="empty">正在读取...</div>';
+  try{
+    const [items,stats]=await Promise.all([
+      api('/api/community/visits?limit=25&offset='+offset+(filter==='all'?'':'&status='+filter)),
+      api('/api/community/visits/stats')
+    ]);
+    if(version!==sessionVersion||requestSeq!==visitRequestSeq||currentView!=='visits')return;
+    visitItems=items;visitTotal=filter==='all'?stats.total:stats[filter];
+    if(statsSeq===visitStatsRequestSeq)applyVisitStats(stats);
+    if(offset&&offset>=visitTotal){visitOffset=Math.max(0,Math.floor((visitTotal-1)/25)*25);return await loadVisitList()}
+    visitLoading=false;renderVisitList();
+  }catch(e){
+    if(version!==sessionVersion||requestSeq!==visitRequestSeq||currentView!=='visits')return;
+    visitLoading=false;visitItems=[];$('visitList').innerHTML='<div class="empty">'+clean(e.message)+'</div>';
+    $('visitPrev').disabled=visitOffset===0;$('visitNext').disabled=true;
+  }
+}
+function filterVisits(status){
+  if(!['planned','done','all'].includes(status))return;
+  visitFilter=status;visitOffset=0;$('visitStatus').value=status;return loadVisitList();
+}
+function pageVisits(step){
+  if(visitLoading||(step>0&&visitOffset+25>=visitTotal)||(step<0&&!visitOffset))return;
+  visitOffset=Math.max(0,visitOffset+step*25);return loadVisitList();
+}
+$('visitStatus').addEventListener('change',e=>filterVisits(e.target.value));
+$('visitPrev').addEventListener('click',()=>pageVisits(-1));
+$('visitNext').addEventListener('click',()=>pageVisits(1));
 async function loadStats(){
   const requestSeq=++statsRequestSeq;
   const version=sessionVersion;
@@ -389,29 +485,4 @@ async function logoutAllDevices(){
   try{await api('/api/auth/logout-all','POST');logout();notify('已在所有设备退出登录')}catch(e){notify(e.message)}
 }
 </script>
-<script>
-(function(){
-  var v=document.getElementById('heroVideo');if(!v)return;
-  var reduced=false;try{reduced=matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){}
-  if(reduced){v.remove();return}
-  v.addEventListener('playing',function(){v.classList.add('on')});
-  var p=v.play&&v.play();if(p&&p.catch)p.catch(function(){});
-})();
-</script>
-<script>
-(function(){
-  var box=document.getElementById('heroPulse');if(!box)return;
-  var W=box.clientWidth||600,H=24,GRID=9.6,PS=5;
-  function g(t,c,s2){var d=t-c;return Math.exp(-d*d/(2*s2*s2))}
-  var cx=W*0.72;
-  function wave(x){var t=x-cx;return 4*g(t,-16,6)-3.5*g(t,-5,2.4)+9*g(t,0,2.4)-7*g(t,8,3.2)+2*g(t,23,8)}
-  var n=Math.floor(W/GRID),x0=(W-n*GRID)/2+GRID/2,prev=0,pd=false;
-  function add(x,row,base){var el=document.createElement('i');if(base)el.className='base';
-    el.style.left=(x-PS/2).toFixed(1)+'px';el.style.top=(H/2-row-PS/2).toFixed(1)+'px';box.appendChild(el)}
-  for(var i=0;i<n;i++){var x=x0+i*GRID,y=wave(x),row=Math.round(y/GRID)*GRID;
-    if(Math.abs(row)<GRID*0.55){add(x,row,true);prev=row;pd=true}
-    else{if(pd){var a=Math.min(prev,row),b=Math.max(prev,row);
-      for(var r=a;r<=b+0.01;r+=GRID){if(Math.abs(r)<1)continue;add(x,r,false)}}
-      else add(x,row,false);prev=row;pd=true}}
-})();
-</script></body></html>
+</body></html>

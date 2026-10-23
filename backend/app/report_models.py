@@ -1,7 +1,7 @@
 """Private report records and the trace from reviewed findings to vital rows."""
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .crypto import decrypt_value, encrypt_value
@@ -60,3 +60,22 @@ class ReportVitalLink(Base):
     report_id: Mapped[int] = mapped_column(ForeignKey("medical_reports.id"), index=True)
     item_id: Mapped[str] = mapped_column(String(80))
     vital_id: Mapped[int | None] = mapped_column(ForeignKey("vitals.id", ondelete="SET NULL"), nullable=True)
+    imported_revision: Mapped[int] = mapped_column(Integer, default=1)
+    imported_snapshot_json: Mapped[str | None] = mapped_column(EncryptedText(), nullable=True)
+    needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    flagged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ReportRevision(Base):
+    """Append-only, encrypted human review snapshots; source blobs stay immutable."""
+    __tablename__ = "report_revisions"
+    __table_args__ = (UniqueConstraint("report_id", "revision", name="uq_report_revision"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    report_id: Mapped[int] = mapped_column(ForeignKey("medical_reports.id"), index=True)
+    revision: Mapped[int] = mapped_column(Integer)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    actor_name: Mapped[str] = mapped_column(EncryptedText())
+    reason: Mapped[str] = mapped_column(EncryptedText())
+    review_json: Mapped[str] = mapped_column(EncryptedText())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -51,3 +51,54 @@
 .ar-import .ar-field{margin:7px 0 3px}
 @media(max-width:960px){.ar-review-grid{grid-template-columns:1fr}.ar-source{position:static;max-height:500px}.ar-body{grid-template-columns:230px minmax(0,1fr)}.ar-detail{padding:18px}}
 @media(max-width:680px){.ar-backdrop{padding:0}.ar-panel{height:100vh;border-radius:0}.ar-top{font-size:16px;min-height:56px}.ar-body{display:block;overflow:auto}.ar-sidebar{border-right:0;border-bottom:1px solid #eee3e8;overflow:visible}.ar-detail{overflow:visible}.ar-header-fields,.ar-item-fields{grid-template-columns:1fr}}
+
+/* Warm paper and teal, with clear review and provenance states. */
+.ar-backdrop{background:rgba(18,39,33,.6);color:#253b34}
+.ar-panel{background:#fffdf8;box-shadow:0 28px 90px rgba(18,39,33,.24)}
+.ar-top{background:#f6f5ed;border-color:#dce5dc;color:#214a3d}
+.ar-sidebar{background:#f8f7f1;border-color:#dce5dc}
+.ar-detail{background:#fffdf8}
+.ar-button{border-color:#cadbd1;color:#294e40;min-height:42px}
+.ar-button:hover{background:#edf5ee;border-color:#88b4a1}
+.ar-button:focus-visible,.ar-field input:focus-visible,.ar-field textarea:focus-visible,.ar-field select:focus-visible,.ar-history summary:focus-visible{outline:3px solid #83baa5;outline-offset:3px}
+.ar-primary{background:#176b5b;border-color:#176b5b;color:#fff}
+.ar-primary:hover{background:#105447;border-color:#105447;color:#fff}
+.ar-note{color:#627267}
+.ar-list{border-color:#dce5dc}
+.ar-report-row{background:#fffdf8;gap:6px}
+.ar-report-row.active{background:#edf5ee;border-color:#73a58e;box-shadow:inset 3px 0 #176b5b}
+.ar-report-row span{color:#63786c}
+.ar-status{background:#eaf2e8;color:#356b4f}
+.ar-consent{color:#40564a}
+.ar-consent input{accent-color:#176b5b}
+.ar-source,.ar-review{border-color:#dce5dc;background:#fffefa}
+.ar-source,.ar-page-controls{background:#f2f4ed}
+.ar-page-controls{border-color:#dce5dc}
+.ar-field{color:#4a6154}
+.ar-field input,.ar-field textarea,.ar-field select{border-color:#cfdbd1;background:#fffefa;color:#283f33;font:inherit;font-weight:400;border-radius:9px;padding:10px 11px;min-width:0;width:100%;box-sizing:border-box}
+.ar-field input:disabled,.ar-field textarea:disabled{background:#f4f5ef;color:#526557}
+.ar-quote{background:#f1f4ed;color:#506253}
+.ar-import{border-color:#b8d0bf;background:#f7faf2}
+.ar-item{border-color:#dce5dc}
+.ar-source-badge{display:inline-block;background:#edf3e9;color:#49705b;border-radius:6px;padding:4px 7px;font-size:11px;margin:9px 0 3px}
+.ar-text-button{background:transparent;border-color:transparent;padding:5px 9px;font-size:12px;margin:2px 5px 8px 0;text-decoration:underline;text-underline-offset:3px}
+.ar-excluded{background:#f7f6f0;padding:16px 10px;opacity:.8;border-radius:10px;margin:10px 0}
+.ar-excluded .ar-source-badge{background:#e9e7de;color:#716c5d}
+.ar-review-count{font-weight:650;color:#176b5b;border-bottom:1px solid #dce5dc;padding-bottom:10px}
+.ar-eyebrow{font-size:11px;letter-spacing:.08em;font-weight:700;color:#567f68}
+.ar-empty-detail{max-width:480px;padding:72px 12px}
+.ar-empty-detail h3{font-size:27px;line-height:1.4;margin-top:18px}
+.ar-empty{border:1px dashed #cad8c9;border-radius:12px;padding:20px 13px;background:#fffdf8}
+.ar-filters{border-top:1px solid #dce5dc;padding-top:14px;margin-bottom:15px}
+.ar-filters h4,.ar-history h4{font-size:14px;margin:0 0 12px;color:#285842}
+.ar-filters>.ar-field{margin-bottom:12px}
+.ar-filter-dates{display:grid;grid-template-columns:1fr;gap:10px}
+.ar-history{border:1px solid #cadbd1;border-radius:16px;background:#f7faf3;padding:18px;margin:18px 0}
+.ar-history-entry{border-top:1px solid #dce5dc;padding:12px 0}
+.ar-history-entry summary{cursor:pointer;font-size:13px;font-weight:650;color:#2f5d47;line-height:1.7}
+.ar-history-entry h5{margin:20px 0 8px;font-size:13px}
+.ar-history-change{padding:8px 10px;background:#edf4e8;border-radius:8px;color:#3b654a;overflow-wrap:anywhere}
+.ar-history-item{padding:10px;border-bottom:1px solid #e0e7da;font-size:13px;overflow-wrap:anywhere}
+.ar-history-item .ar-note{margin:6px 0}
+.ar-message .ar-button{margin-left:12px;min-height:34px}
+@media(max-width:680px){.ar-empty-detail{padding:30px 0}.ar-filter-dates{grid-template-columns:1fr 1fr}.ar-history{padding:14px}.ar-source.ar-zoomed .ar-page-image{min-width:1000px}}

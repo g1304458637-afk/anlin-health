@@ -18,6 +18,10 @@ MAX_BYTES = 10 * 1024 * 1024
 MAX_PAGES = 5
 
 
+class ParserEnvironmentError(ValueError):
+    """The parser could not run; retrying a different document will not fix it."""
+
+
 def _child_operation(data: bytes, operation: str, page: int = 1):
     """No filenames or shell commands originate from uploaded data."""
     if not data or len(data) > MAX_BYTES:
@@ -28,14 +32,22 @@ def _child_operation(data: bytes, operation: str, page: int = 1):
         result = subprocess.run([sys.executable, "-m", "app.report_processing", operation, str(page)],
                                 input=data, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                 timeout=18, check=False, env=env)
-        if result.returncode or len(result.stdout) > 18 * 1024 * 1024:
-            raise ValueError("无法安全读取文件，请使用完整的 PDF、PNG、JPEG 或 WebP")
+        if result.returncode:
+            raise ValueError("报告解析进程未正常完成，请缩小文件或联系管理员")
+        if len(result.stdout) > 18 * 1024 * 1024:
+            raise ValueError("报告解析结果过大，请缩小文件后重试")
         payload = json.loads(result.stdout)
         if "error" in payload:
+            if payload.get("error_type") == "environment":
+                raise ParserEnvironmentError(payload["error"])
             raise ValueError(payload["error"])
         return payload
-    except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
-        raise ValueError("文件解析超时或格式无效，请缩小文件后重试") from None
+    except subprocess.TimeoutExpired:
+        raise ValueError("文件解析超时，请缩小文件后重试") from None
+    except OSError:
+        raise ParserEnvironmentError("报告解析环境无法启动，请联系管理员") from None
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise ParserEnvironmentError("报告解析进程返回无效结果，请联系管理员") from None
 
 
 def inspect_document(data: bytes) -> dict:
@@ -214,7 +226,11 @@ def _parse_child(data: bytes, operation: str, page_number: int):
     return {"image": base64.b64encode(output.getvalue()).decode(), "text": text, "has_images": has_images}
 
 
-if __name__ == "__main__":
+def _apply_resource_limits():
+    # Windows has no resource module. Document size/pixel bounds and the parent
+    # process's wall-clock timeout still apply; Unix retains its CPU limits.
+    if sys.platform == "win32":
+        return
     try:
         import resource
         resource.setrlimit(resource.RLIMIT_CPU, (12, 12))
@@ -222,12 +238,27 @@ if __name__ == "__main__":
         # additionally cap the parser's virtual memory. Both use CPU/wall limits.
         if sys.platform.startswith("linux"):
             resource.setrlimit(resource.RLIMIT_AS, (768 * 1024 * 1024, 768 * 1024 * 1024))
+    except (ImportError, OSError, ValueError):
+        raise ParserEnvironmentError("报告解析环境无法启用资源限制，请联系管理员") from None
+
+
+def _child_result():
+    try:
+        _apply_resource_limits()
         raw = sys.stdin.buffer.read(MAX_BYTES + 1)
         if not raw or len(raw) > MAX_BYTES:
             raise ValueError("文件为空或超过 10 MB")
-        payload = _parse_child(raw, sys.argv[1], int(sys.argv[2]))
+        return _parse_child(raw, sys.argv[1], int(sys.argv[2]))
+    except ParserEnvironmentError as exc:
+        return {"error": str(exc), "error_type": "environment"}
+    except ImportError:
+        return {"error": "报告解析依赖未正确安装，请联系管理员", "error_type": "environment"}
     except ValueError as exc:
-        payload = {"error": str(exc)[:200]}
+        return {"error": str(exc)[:200]}
     except Exception:
-        payload = {"error": "文件损坏或不支持此格式，请重新导出静态 PDF 或清晰图片"}
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False))
+        return {"error": "文件损坏或不支持此格式，请重新导出静态 PDF 或清晰图片"}
+
+
+if __name__ == "__main__":
+    # The parent decodes JSON as UTF-8, irrespective of Windows console locale.
+    sys.stdout.buffer.write(json.dumps(_child_result(), ensure_ascii=False).encode("utf-8"))

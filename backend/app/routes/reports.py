@@ -3,7 +3,7 @@ import hashlib
 import asyncio
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -17,9 +17,9 @@ from ..db import get_db
 from ..deps import audit, auth_user, check_access
 from ..models import Resident, User, Vital
 from ..ratelimit import SlidingWindowLimiter
-from ..report_models import MedicalReport, ReportVitalLink
+from ..report_models import MedicalReport, ReportRevision, ReportVitalLink
 from ..report_storage import delete_blob, new_storage_key, read_blob, write_blob
-from ..report_types import ReportReview
+from ..report_types import ReportReview, ReportRevisionIn
 from ..schemas import VitalIn
 from .. import report_processing
 
@@ -40,27 +40,32 @@ def _accessible(db: Session, user: User, report_id: int, *, write: bool = False)
 
 
 def _summary(report: MedicalReport) -> dict:
+    document = json.loads(report.reviewed_json or report.candidate_json or "{}")
     return {
         "id": report.id, "resident_id": report.resident_id, "filename": report.filename,
         "mime_type": report.mime_type, "page_count": report.page_count,
         "status": report.status, "revision": report.revision, "attempts": report.attempts,
         "error": report.error, "created_at": report.created_at, "updated_at": report.updated_at,
         "confirmed_at": report.confirmed_at,
+        "title": document.get("title") or report.filename,
+        "item_count": len(document.get("items", [])) - len(document.get("excluded_item_ids", [])),
     }
 
 
 def _detail(db: Session, report: MedicalReport, resident: Resident) -> dict:
     candidate = json.loads(report.candidate_json) if report.candidate_json else None
     reviewed = json.loads(report.reviewed_json) if report.reviewed_json else None
-    links = db.execute(select(ReportVitalLink.item_id, ReportVitalLink.vital_id).where(
-        ReportVitalLink.report_id == report.id)).all()
+    links = db.scalars(select(ReportVitalLink).where(ReportVitalLink.report_id == report.id)).all()
     patient_names = [record.get("patient_name") for record in (candidate, reviewed) if isinstance(record, dict)]
     return {
         **_summary(report), "candidate": candidate, "reviewed": reviewed,
-        "imported_vital_ids": [vital_id for _, vital_id in links if vital_id is not None],
-        "imported_vitals": [{"item_id": item_id, "vital_id": vital_id} for item_id, vital_id in links
-                            if vital_id is not None],
-        "deleted_import_count": sum(vital_id is None for _, vital_id in links),
+        "imported_vital_ids": [link.vital_id for link in links if link.vital_id is not None],
+        "imported_vitals": [{"item_id": link.item_id, "vital_id": link.vital_id,
+                             "imported_revision": link.imported_revision,
+                             "needs_review": link.needs_review, "flagged_at": link.flagged_at}
+                            for link in links if link.vital_id is not None],
+        "deleted_import_count": sum(link.vital_id is None for link in links),
+        "affected_import_count": sum(link.needs_review and link.vital_id is not None for link in links),
         "name_match_warning": any(name and "".join(name.split()) != "".join(resident.name.split())
                                   for name in patient_names),
     }
@@ -118,6 +123,8 @@ async def upload_report(resident_id: int, request: Request, response: Response, 
         raise HTTPException(429, "报告数量已达上限")
     try:
         inspected = await asyncio.to_thread(report_processing.inspect_document, raw)
+    except report_processing.ParserEnvironmentError as exc:
+        raise HTTPException(503, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     actual_mime = inspected["mime_type"]
@@ -153,12 +160,36 @@ async def upload_report(resident_id: int, request: Request, response: Response, 
 
 @router.get("/residents/{resident_id}/reports")
 def list_reports(resident_id: int, response: Response, limit: int = Query(20, ge=1, le=100),
-                 offset: int = Query(0, ge=0), user: User = Depends(auth_user), db: Session = Depends(get_db)):
+                 offset: int = Query(0, ge=0), q: str = Query("", max_length=100),
+                 status: str | None = Query(None, pattern="^(uploaded|queued|processing|draft|failed|confirmed)$"),
+                 date_from: date | None = None, date_to: date | None = None,
+                 user: User = Depends(auth_user), db: Session = Depends(get_db)):
     response.headers.update(_NO_STORE)
     check_access(db, user, db.get(Resident, resident_id), scope="reports")
     query = select(MedicalReport).where(MedicalReport.resident_id == resident_id)
-    total = db.scalar(select(func.count()).select_from(MedicalReport).where(MedicalReport.resident_id == resident_id)) or 0
-    rows = db.scalars(query.order_by(MedicalReport.created_at.desc(), MedicalReport.id.desc()).offset(offset).limit(limit)).all()
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(422, "开始日期不能晚于结束日期")
+    if status:
+        query = query.where(MedicalReport.status == status)
+    # Dates refer to upload time, using the same UTC day bounds in API and UI.
+    if date_from:
+        query = query.where(MedicalReport.created_at >= datetime.combine(date_from, time.min, timezone.utc))
+    if date_to:
+        query = query.where(MedicalReport.created_at <= datetime.combine(date_to, time.max, timezone.utc))
+    rows = db.scalars(query.order_by(MedicalReport.created_at.desc(), MedicalReport.id.desc())).all()
+    needle = "".join(q.casefold().split())
+    if needle:
+        # At most 200 reports per resident; do not create a plaintext health index.
+        def matches(row):
+            document = json.loads(row.reviewed_json or row.candidate_json or "{}")
+            excluded = set(document.get("excluded_item_ids", []))
+            text = " ".join([row.filename, document.get("title") or "", *[
+                " ".join(str(item.get(field) or "") for field in ("name", "value", "unit", "reference_range", "flag"))
+                for item in document.get("items", []) if item.get("id") not in excluded]])
+            return needle in "".join(text.casefold().split())
+        rows = [row for row in rows if matches(row)]
+    total = len(rows)
+    rows = rows[offset:offset + limit]
     audit(db, user, "list_reports", "resident", resident_id)
     db.commit()
     return {"items": [_summary(row) for row in rows], "total": total, "limit": limit, "offset": offset}
@@ -190,6 +221,8 @@ def report_page(report_id: int, page: int, user: User = Depends(auth_user), db: 
         raise HTTPException(404, "报告页不存在")
     try:
         png = report_processing.render_page(_verified_data(report), page)
+    except report_processing.ParserEnvironmentError as exc:
+        raise HTTPException(503, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     audit(db, user, "read_report_page", "medical_report", report.id)
@@ -279,39 +312,138 @@ def _validate_import(imp: dict, item: dict) -> VitalIn:
         raise HTTPException(422, str(exc)) from exc
 
 
+def _review_payload(report: MedicalReport, body: ReportReview, previous: dict | None = None) -> dict:
+    """Keep every extraction anchor; exclusions are explicit and additions are manual."""
+    if not body.identity_confirmed:
+        raise HTTPException(422, "请先确认报告身份")
+    review = body.model_dump(mode="json")
+    candidate = json.loads(report.candidate_json or "{}")
+    original_items = {item["id"]: item for item in candidate.get("items", [])}
+    if len(original_items) != len(candidate.get("items", [])):
+        raise HTTPException(422, "原始项目来源重复，请重新核对")
+    known_manual = {item["id"] for item in (previous or {}).get("items", [])
+                    if item.get("source_kind") == "manual"}
+    supplied_ids = [item["id"] for item in review["items"]]
+    if len(supplied_ids) != len(set(supplied_ids)):
+        raise HTTPException(422, "报告项目不能重复")
+    id_map = {}
+    for item in review["items"]:
+        item_id = item["id"]
+        if item_id in original_items:
+            original = original_items[item_id]
+            if item["source_kind"] != "extracted" or any(item[field] != original[field] for field in ("page", "quote")):
+                raise HTTPException(422, "报告项目的来源页和原文不可修改")
+        else:
+            if item["source_kind"] != "manual" or item["quote"]:
+                raise HTTPException(422, "新增项目必须明确标记为人工补录，不能伪造原文")
+            if re.fullmatch(r"new:[A-Za-z0-9-]{1,36}", item_id):
+                # Stable, server-derived IDs also make initial-confirmation retries idempotent.
+                item["id"] = "m-" + hashlib.sha256(f"{report.id}:{item_id}".encode()).hexdigest()[:32]
+                id_map[item_id] = item["id"]
+            elif item_id not in known_manual:
+                raise HTTPException(422, "人工项目编号无效，请重新打开报告")
+        if item["page"] is not None and item["page"] > report.page_count:
+            raise HTTPException(422, "项目定位页码超出报告范围")
+    ids = {item["id"] for item in review["items"]}
+    if len(ids) != len(review["items"]) or not set(original_items).issubset(ids) or not known_manual.issubset(ids):
+        raise HTTPException(422, "请用排除标记移除误识别项目，保留来源历史")
+    excluded = [id_map.get(item_id, item_id) for item_id in review["excluded_item_ids"]]
+    if len(excluded) != len(set(excluded)) or not set(excluded).issubset(ids):
+        raise HTTPException(422, "排除的项目无效或重复")
+    review["excluded_item_ids"] = excluded
+    for imp in review["imports"]:
+        imp["item_id"] = id_map.get(imp["item_id"], imp["item_id"])
+    return review
+
+
+def _import_snapshot(review: dict, item_id: str) -> dict:
+    item = next((item for item in review["items"] if item["id"] == item_id), None)
+    if item_id in review.get("excluded_item_ids", []):
+        item = None
+    return {"item": ({field: item.get(field) for field in ("name", "value", "unit", "reference_range", "flag")}
+                     if item else None),
+            **{field: review.get(field) for field in ("patient_name", "specimen_collected_at", "reported_at")}}
+
+
+def _snapshot(report_id, revision, actor, reason, review, when):
+    return ReportRevision(report_id=report_id, revision=revision,
+                          actor_id=actor.id if actor else None,
+                          actor_name=actor.display_name if actor else "历史确认人",
+                          reason=reason, review_json=json.dumps(review, ensure_ascii=False), created_at=when)
+
+
+def _diff_reviews(before: dict | None, after: dict) -> list[dict]:
+    changes = []
+    if before is None:
+        return [{"kind": "initial", "label": "首次确认", "before": None, "after": after["title"]}]
+    labels = {"title": "报告名称", "patient_name": "报告患者姓名", "specimen_collected_at": "采样时间", "reported_at": "报告时间"}
+    for key, label in labels.items():
+        if before.get(key) != after.get(key):
+            changes.append({"kind": "header", "label": label, "before": before.get(key), "after": after.get(key)})
+    previous = {item["id"]: item for item in before["items"]}
+    old_excluded, new_excluded = set(before.get("excluded_item_ids", [])), set(after.get("excluded_item_ids", []))
+    field_labels = {"name": "名称", "value": "结果", "unit": "单位", "reference_range": "参考范围", "flag": "标记", "page": "人工定位页"}
+    for item in after["items"]:
+        item_id, old = item["id"], previous.get(item["id"])
+        if old is None:
+            changes.append({"kind": "manual_add", "item_id": item_id, "label": item["name"], "before": None, "after": item["value"] + " " + item["unit"]})
+        else:
+            for field, label in field_labels.items():
+                if old.get(field) != item.get(field):
+                    changes.append({"kind": "field", "item_id": item_id, "label": item["name"] + " · " + label,
+                                    "before": old.get(field), "after": item.get(field)})
+        if (item_id in old_excluded) != (item_id in new_excluded):
+            changes.append({"kind": "excluded", "item_id": item_id, "label": item["name"],
+                            "before": "已排除" if item_id in old_excluded else "保留",
+                            "after": "已排除" if item_id in new_excluded else "保留"})
+    return changes
+
+
+@router.get("/reports/{report_id}/history")
+def report_history(report_id: int, response: Response, user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    response.headers.update(_NO_STORE)
+    report, _ = _accessible(db, user, report_id)
+    rows = db.scalars(select(ReportRevision).where(ReportRevision.report_id == report_id)
+                      .order_by(ReportRevision.revision)).all()
+    if not rows and report.reviewed_json:
+        rows = [_snapshot(report.id, report.revision, db.get(User, report.confirmed_by_id) if report.confirmed_by_id else None,
+                          "首次人工确认（历史记录）", json.loads(report.reviewed_json), report.confirmed_at or report.updated_at)]
+    result, previous = [], None
+    for row in rows:
+        review = json.loads(row.review_json)
+        result.append({"revision": row.revision, "actor_id": row.actor_id, "actor_name": row.actor_name,
+                       "reason": row.reason, "created_at": row.created_at, "review": review,
+                       "changes": _diff_reviews(previous, review)})
+        previous = review
+    audit(db, user, "read_report_history", "medical_report", report.id)
+    db.commit()
+    return {"report_id": report.id, "current_revision": report.revision, "items": list(reversed(result))}
+
+
 @router.post("/reports/{report_id}/confirm")
 def confirm_report(report_id: int, body: ReportReview, response: Response,
                    user: User = Depends(auth_user), db: Session = Depends(get_db)):
     response.headers.update(_NO_STORE)
     report, resident = _accessible(db, user, report_id, write=True)
-    review = body.model_dump(mode="json")
+    previous = json.loads(report.reviewed_json) if report.reviewed_json else None
+    review = _review_payload(report, body, previous)
     if report.status == "confirmed" and report.revision == body.revision:
-        if report.reviewed_json and json.loads(report.reviewed_json) == review:
+        if previous and ReportReview.model_validate(previous).model_dump(mode="json") == review:
             return _detail(db, report, resident)
         raise HTTPException(409, "报告已确认，不能再修改")
     if report.status != "draft" or report.revision != body.revision or not report.candidate_json:
         raise HTTPException(409, "报告版本已变化，请重新载入")
-    if not body.identity_confirmed:
-        raise HTTPException(422, "请先确认报告身份")
-    candidate = json.loads(report.candidate_json)
-    original_items = {item["id"]: item for item in candidate.get("items", [])}
     reviewed_items = {item["id"]: item for item in review["items"]}
-    if (len(original_items) != len(candidate.get("items", [])) or
-            len(reviewed_items) != len(review["items"]) or original_items.keys() != reviewed_items.keys()):
-        raise HTTPException(422, "报告项目不能增删或重复")
-    for item_id, item in reviewed_items.items():
-        original = original_items[item_id]
-        if any(item[field] != original[field] for field in ("id", "page", "quote")):
-            raise HTTPException(422, "报告项目的来源页和原文不可修改")
     imports = review.get("imports", [])
     if len({imp["item_id"] for imp in imports}) != len(imports):
         raise HTTPException(422, "同一项目只能导入一次")
     validated = []
     for imp in imports:
         item = reviewed_items.get(imp["item_id"])
-        if item is None:
-            raise HTTPException(422, "导入项目不在报告中")
+        if item is None or imp["item_id"] in review["excluded_item_ids"]:
+            raise HTTPException(422, "导入项目不在报告中或已被排除")
         validated.append((imp, _validate_import(imp, item)))
+    _verified_data(report)
     now = datetime.now(timezone.utc)
     changed = db.execute(update(MedicalReport).where(
         MedicalReport.id == report.id, MedicalReport.status == "draft", MedicalReport.revision == body.revision
@@ -325,8 +457,54 @@ def confirm_report(report_id: int, body: ReportReview, response: Response,
                       **vital_in.model_dump(exclude={"measured_at"}), measured_at=vital_in.measured_at)
         db.add(vital)
         db.flush()
-        db.add(ReportVitalLink(report_id=report.id, item_id=imp["item_id"], vital_id=vital.id))
+        db.add(ReportVitalLink(report_id=report.id, item_id=imp["item_id"], vital_id=vital.id,
+                              imported_revision=report.revision,
+                              imported_snapshot_json=json.dumps(_import_snapshot(review, imp["item_id"]), ensure_ascii=False)))
+    db.add(_snapshot(report.id, report.revision, user, "首次人工确认", review, now))
     audit(db, user, "confirm_report", "medical_report", report.id)
+    db.commit()
+    db.refresh(report)
+    return _detail(db, report, resident)
+
+
+@router.post("/reports/{report_id}/revisions")
+def revise_report(report_id: int, body: ReportRevisionIn, response: Response,
+                  user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    response.headers.update(_NO_STORE)
+    report, resident = _accessible(db, user, report_id, write=True)
+    if report.status != "confirmed" or report.revision != body.expected_revision or not report.reviewed_json:
+        raise HTTPException(409, "报告版本已变化，请重新打开后修订")
+    if body.review.revision != body.expected_revision:
+        raise HTTPException(409, "核对版本与当前报告不一致")
+    if body.review.imports:
+        raise HTTPException(422, "修订不会新增或覆盖健康记录，请在健康记录中单独核对")
+    previous = json.loads(report.reviewed_json)
+    review = _review_payload(report, body.review, previous)
+    if not _diff_reviews(previous, review):
+        raise HTTPException(422, "尚未修改报告内容")
+    _verified_data(report)
+    old_revision, old_actor, old_time = report.revision, report.confirmed_by_id, report.confirmed_at or report.updated_at
+    now = datetime.now(timezone.utc)
+    review["revision"] = old_revision + 1
+    changed = db.execute(update(MedicalReport).where(
+        MedicalReport.id == report.id, MedicalReport.status == "confirmed", MedicalReport.revision == old_revision
+    ).values(revision=old_revision + 1, reviewed_json=json.dumps(review, ensure_ascii=False),
+             confirmed_by_id=user.id, confirmed_at=now, updated_at=now).execution_options(synchronize_session=False))
+    if changed.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, "报告已被其他人修订，请重新打开")
+    if not db.scalar(select(ReportRevision.id).where(ReportRevision.report_id == report.id,
+                                                   ReportRevision.revision == old_revision)):
+        db.add(_snapshot(report.id, old_revision, db.get(User, old_actor) if old_actor else None,
+                         "首次人工确认（历史记录）", previous, old_time))
+    for link in db.scalars(select(ReportVitalLink).where(ReportVitalLink.report_id == report.id)).all():
+        baseline = json.loads(link.imported_snapshot_json) if link.imported_snapshot_json else _import_snapshot(previous, link.item_id)
+        if link.imported_snapshot_json is None:
+            link.imported_snapshot_json = json.dumps(baseline, ensure_ascii=False)
+        if baseline != _import_snapshot(review, link.item_id) and not link.needs_review:
+            link.needs_review, link.flagged_at = True, now
+    db.add(_snapshot(report.id, old_revision + 1, user, body.reason, review, now))
+    audit(db, user, "revise_report", "medical_report", report.id)
     db.commit()
     db.refresh(report)
     return _detail(db, report, resident)

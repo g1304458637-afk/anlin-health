@@ -1,19 +1,37 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Literal
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, func
 from ..db import get_db
 from ..models import User, Resident, Visit, AuditLog
 from ..deps import require_roles, auth_user, check_access, is_owner, audit, consent_active
 from ..schemas import VisitIn, VisitOut, VisitFinish
+from ..reporting import visible_resident_ids
 
 router = APIRouter(prefix="/api", tags=["visits"])
 
 
 @router.get("/community/visits", response_model=list[VisitOut])
-def staff_visits(user: User = Depends(require_roles("staff")), db: Session = Depends(get_db)):
-    visits = db.scalars(select(Visit).join(Resident, Visit.resident_id == Resident.id).where(Resident.community_id == user.community_id).order_by(Visit.due_date.desc()).limit(100)).all()
-    return [v for v in visits if consent_active(db, v.resident_id)]
+def staff_visits(limit: int = Query(100, ge=1, le=100), offset: int = Query(0, ge=0),
+                 status: Literal["planned", "done"] | None = None,
+                 user: User = Depends(require_roles("staff")), db: Session = Depends(get_db)):
+    query = select(Visit).where(Visit.resident_id.in_(visible_resident_ids(user.community_id)))
+    if status is not None:
+        query = query.where(Visit.status == status)
+    return db.scalars(query.order_by(Visit.due_date.desc(), Visit.id.desc()).offset(offset).limit(limit)).all()
+
+
+@router.get("/community/visits/stats")
+def visit_stats(user: User = Depends(require_roles("staff")), db: Session = Depends(get_db)):
+    visible = visible_resident_ids(user.community_id)
+    counts = dict(db.execute(select(Visit.status, func.count()).where(
+        Visit.resident_id.in_(visible)).group_by(Visit.status)).all())
+    overdue = db.scalar(select(func.count()).select_from(Visit).where(
+        Visit.resident_id.in_(visible), Visit.status == "planned",
+        Visit.due_date < datetime.now(timezone.utc).date())) or 0
+    return {"total": sum(counts.values()), "planned": counts.get("planned", 0),
+            "done": counts.get("done", 0), "overdue": overdue}
 
 
 @router.post("/community/visits", response_model=VisitOut, status_code=201)

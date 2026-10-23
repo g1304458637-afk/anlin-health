@@ -12,7 +12,7 @@ from sqlalchemy import text
 from .db import engine, Base
 from .config import settings, validate_settings
 from . import models  # noqa: F401 - registers mappings
-from .routes import auth, residents, vitals, questionnaires, reminders, family, visits, admin, reporting, assistant, reports, report_assistant
+from .routes import auth, residents, vitals, questionnaires, reminders, family, visits, admin, reporting, assistant, reports, report_assistant, plans
 
 
 @asynccontextmanager
@@ -22,15 +22,18 @@ async def lifespan(app: FastAPI):
     if settings.app_env != "production":
         Base.metadata.create_all(bind=engine)
     from .report_worker import worker_loop
+    from .plan_worker import worker_loop as plan_worker_loop
     stop = asyncio.Event()
     worker = asyncio.create_task(worker_loop(stop)) if settings.report_worker_enabled and settings.app_env != "test" else None
+    plan_worker = asyncio.create_task(plan_worker_loop(stop)) if settings.plan_worker_enabled and settings.app_env != "test" else None
     try:
         yield
     finally:
         stop.set()
-        if worker:
-            worker.cancel()
-            await asyncio.gather(worker, return_exceptions=True)
+        workers = [task for task in (worker, plan_worker) if task]
+        for task in workers:
+            task.cancel()
+        await asyncio.gather(*workers, return_exceptions=True)
 
 
 app = FastAPI(title="社区健康管理 API（试点工程）", version="0.6.0", lifespan=lifespan,
@@ -60,7 +63,7 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-for router in [auth.router, residents.router, vitals.router, questionnaires.router, reminders.router, family.router, visits.router, admin.router, reporting.router, assistant.router, reports.router, report_assistant.router]:
+for router in [auth.router, residents.router, vitals.router, questionnaires.router, reminders.router, family.router, visits.router, admin.router, reporting.router, assistant.router, reports.router, report_assistant.router, plans.router]:
     app.include_router(router)
 
 app.mount("/static", StaticFiles(directory=Path(__file__).resolve().parents[1] / "static"), name="static")

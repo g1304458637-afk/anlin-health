@@ -24,16 +24,18 @@ class Element {
 }
 
 function harness(role='resident'){
-  const events={}, requests=[], asked=[];let auth={token:'private-token',user:{id:11,role}}, status='uploaded';
+  const events={}, requests=[], asked=[];let auth={token:'private-token',user:{id:11,role}}, status='uploaded',reviewed=null,revision=1;
   const candidate={title:'检查报告',patient_name:'居民甲',specimen_collected_at:null,reported_at:null,warnings:['请核对原件'],pages:[{page:1,text:'原文'}],items:[{id:'i1',name:'血压',value:'132/84',unit:'mmHg',reference_range:'',flag:'',page:1,quote:'血压 132/84 mmHg'},{id:'i2',name:'其他项目',value:'10',unit:'U/L',reference_range:'',flag:'',page:1,quote:'其他项目 10 U/L'}]};
-  const detail=()=>({id:4,resident_id:2,filename:'报告.pdf',status,page_count:2,revision:1,created_at:'2026-10-23T02:00:00',candidate,reviewed:status==='confirmed'?candidate:null,imported_vital_ids:[]});
+  const detail=()=>({id:4,resident_id:2,filename:'报告.pdf',status,page_count:2,revision,created_at:'2026-10-23T02:00:00',candidate,reviewed:status==='confirmed'?(reviewed||candidate):null,imported_vital_ids:[]});
   const route=async (url,options)=>{
     requests.push({url,options});
     if(url.startsWith('/api/residents/2/reports?'))return {items:[detail()],total:1};
     if(url==='/api/reports/4')return detail();
     if(url==='/api/reports/4/pages/1'||url==='/api/reports/4/pages/2')return new Blob(['png'],{type:'image/png'});
     if(url==='/api/reports/4/extract'){status='draft';return detail()}
-    if(url==='/api/reports/4/confirm'){status='confirmed';return {...detail(),reviewed:JSON.parse(options.body),imported_vital_ids:[22]}}
+    if(url==='/api/reports/4/confirm'){status='confirmed';reviewed=JSON.parse(options.body);return {...detail(),imported_vital_ids:[22]}}
+    if(url==='/api/reports/4/revisions'){const payload=JSON.parse(options.body);revision++;reviewed={...payload.review,revision};return {...detail(),affected_import_count:1,imported_vitals:[{item_id:'i1',vital_id:22,needs_review:true,imported_revision:1}]}}
+    if(url==='/api/reports/4/history')return {report_id:4,current_revision:revision,items:[{revision,actor_name:'虚构确认人',created_at:'2026-10-23T02:00:00Z',reason:'对照原件修订',review:reviewed||candidate,changes:[{label:'血压 · 结果',before:'132/84',after:'130/82'}]}]};
     if(url.startsWith('/api/residents/2/reports?filename='))return detail();
     throw new Error('unexpected '+url);
   };
@@ -69,6 +71,40 @@ test('a reviewed report can be saved without creating measurements',async()=>{
   h.root.querySelector('#ar-identity').checked=true;h.findButton('确认报告').click();await new Promise(r=>setTimeout(r,0));
   const payload=JSON.parse(h.requests.find(x=>x.url.endsWith('/confirm')).options.body);
   assert.equal(payload.imports.length,0);assert.equal(payload.items.length,2);assert.equal(payload.items[1].name,'其他项目');
+});
+
+test('excluded items retain their source and manual additions cannot manufacture quotes',async()=>{
+  const h=harness();h.setStatus('draft');await h.context.anlinReports.open(2,'居民甲');h.findButton('报告.pdf').click();await new Promise(r=>setTimeout(r,0));
+  h.findButton('排除此项').click();assert.match(h.root.textContent,/保留 1 项 · 排除 1 项/);
+  h.findButton('人工补录漏项').click();const card=h.root.querySelectorAll('.ar-item').at(-1),fields=card.querySelector('.ar-item-fields').children;
+  fields[0].children[1].value='人工项目';fields[0].children[1].listeners.input[0]();
+  fields[1].children[1].value='12';fields[1].children[1].listeners.input[0]();
+  assert.match(card.textContent,/未声明原文引用/);
+  h.root.querySelector('#ar-identity').checked=true;h.findButton('确认报告').click();await new Promise(r=>setTimeout(r,0));
+  const body=JSON.parse(h.requests.find(call=>call.url.endsWith('/confirm')).options.body);
+  assert.deepEqual(body.excluded_item_ids,['i1']);assert.equal(body.items[0].quote,'血压 132/84 mmHg');
+  assert.equal(body.items.at(-1).source_kind,'manual');assert.equal(body.items.at(-1).quote,'');assert.equal(body.items.at(-1).page,null);assert.equal(body.imports.length,0);
+});
+
+test('revision requires reason and identity, sends optimistic version, and preserves imported facts',async()=>{
+  const h=harness();h.setStatus('confirmed');await h.context.anlinReports.open(2,'居民甲');h.findButton('报告.pdf').click();await new Promise(r=>setTimeout(r,0));
+  h.findButton('修订报告').click();assert.match(h.root.textContent,/已导入的健康指标不会被覆盖/);
+  const name=h.root.querySelector('.ar-header-fields').children[0].children[1];name.value='修订后的报告';name.listeners.input[0]();
+  h.root.querySelector('#ar-identity').checked=true;h.findButton('保存为新版本').click();assert.equal(h.requests.some(call=>call.url.endsWith('/revisions')),false);
+  const reason=h.root.querySelector('#ar-revision-reason');reason.value='对照原件更正标题';reason.listeners.input[0]();h.findButton('保存为新版本').click();await new Promise(r=>setTimeout(r,0));
+  const body=JSON.parse(h.requests.find(call=>call.url.endsWith('/revisions')).options.body);
+  assert.equal(body.expected_revision,1);assert.equal(body.reason,'对照原件更正标题');assert.equal(body.review.revision,1);assert.equal(body.review.title,'修订后的报告');assert.deepEqual(body.review.imports,[]);
+  assert.match(h.root.textContent,/版本 2/);assert.match(h.root.textContent,/需到健康记录单独核对/);
+  h.findButton('修订历史').click();await new Promise(r=>setTimeout(r,0));assert.match(h.root.textContent,/虚构确认人/);assert.match(h.root.textContent,/此版本全部确认字段/);assert.match(h.root.textContent,/132\/84 → 130\/82/);
+});
+
+test('report filters encode queries and clear to the complete list',async()=>{
+  const h=harness();await h.context.anlinReports.open(2,'居民甲');const search=h.root.querySelector('#ar-search');search.value='血糖 & 检验';search.listeners.input[0]();
+  const status=h.root.querySelector('#ar-status-filter');status.value='confirmed';status.listeners.change[0]();
+  const from=h.root.querySelector('#ar-date_from');from.value='2026-10-20';from.listeners.input[0]();
+  h.findButton('搜索报告').click();await new Promise(r=>setTimeout(r,0));const request=h.requests.at(-1);
+  assert.match(request.url,/q=%E8%A1%80%E7%B3%96%20%26%20%E6%A3%80%E9%AA%8C/);assert.match(request.url,/status=confirmed/);assert.match(request.url,/date_from=2026-10-20/);
+  h.findButton('清除筛选').click();await new Promise(r=>setTimeout(r,0));assert.equal(h.requests.at(-1).url,'/api/residents/2/reports?limit=20&offset=0');
 });
 
 test('citation jump opens only a matching confirmed report revision and actual page',async()=>{

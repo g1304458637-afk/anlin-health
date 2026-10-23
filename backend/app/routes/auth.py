@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from ..db import get_db
 from ..config import settings
-from ..models import User, Resident
+from ..models import User, Resident, ClaimRequest
 from ..ratelimit import login_limiter, wechat_limiter, register_limiter, client_ip
 from ..security import verify_password, validate_password_strength, hash_password, access_token, new_invite_code
 from ..deps import auth_user, audit
@@ -298,10 +298,19 @@ def me(user: User = Depends(auth_user)):
 
 @router.post("/me/family-mode", response_model=UserOut)
 def family_mode(user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    version = user.token_version
+    # Serialize role changes with claim creation/review on databases with row locks.
+    user = db.scalar(select(User).where(User.id == user.id).with_for_update()
+                     .execution_options(populate_existing=True))
+    if not user.is_active or user.token_version != version:
+        raise HTTPException(401, "登录已失效，请重新登录")
     if user.role != "resident":
         raise HTTPException(403, "仅未建档居民可切换家庭身份")
     if db.scalar(select(Resident.id).where(Resident.owner_user_id == user.id)):
         raise HTTPException(409, "已有居民档案，不允许直接转换角色")
+    if db.scalar(select(ClaimRequest.id).where(ClaimRequest.requester_id == user.id,
+                                               ClaimRequest.status == "pending")):
+        raise HTTPException(409, "有待审核的档案认领申请，请先联系工作人员处理后再切换身份")
     user.role = "family"
     audit(db, user, "switch_to_family", "user", user.id)
     db.commit()

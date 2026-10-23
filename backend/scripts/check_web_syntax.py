@@ -36,7 +36,7 @@ def main():
         parser = Scripts()
         parser.feed((static / name).read_text(encoding="utf-8"))
         for index, block in enumerate(parser.blocks, 1):
-            result = subprocess.run(["node", "--check"], input=block, text=True,
+            result = subprocess.run(["node", "--check"], input=block, text=True, encoding="utf-8",
                                     capture_output=True, check=False)
             if result.returncode:
                 raise SystemExit(f"{name} inline script {index}: {result.stderr}")

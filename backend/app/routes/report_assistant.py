@@ -138,7 +138,8 @@ async def report_chat(body: ReportChatIn, response: Response,
     report_meta = {"id": report.id, "resident_id": report.resident_id,
                    "resident_name": resident.name, "filename": report.filename,
                    "title": reviewed["title"], "revision": revision,
-                   "confirmed_item_count": len(reviewed["items"])}
+                   "confirmed_item_count": sum(item["id"] not in reviewed.get("excluded_item_ids", [])
+                                               for item in reviewed["items"])}
     audit(db, user, "assistant_read_confirmed_report", "medical_report", report.id)
     db.commit()
     db.expire_all()

@@ -10,3 +10,4 @@ psycopg[binary]>=3.2,<4
 pypdf==6.10.0
 pypdfium2==5.14.0
 Pillow==12.3.0
+tzdata>=2026.1,<2027

@@ -52,7 +52,7 @@ def build_evidence(report, resident, candidate: dict, reviewed: dict) -> tuple[d
     pages = candidate.get("pages")
     if not isinstance(original_items, list) or not isinstance(reviewed_items, list) or not isinstance(pages, list):
         raise ValueError("报告出处数据不完整")
-    if len(original_items) > MAX_EVIDENCE or len(original_items) != len(reviewed_items):
+    if len(original_items) > MAX_EVIDENCE or len(reviewed_items) > 200:
         raise ValueError("报告项目数量无效")
     if len(pages) > 5 or not all(isinstance(p, dict) and type(p.get("page")) is int and
                isinstance(p.get("text"), str) and len(p["text"]) <= 25000 and
@@ -71,12 +71,23 @@ def build_evidence(report, resident, candidate: dict, reviewed: dict) -> tuple[d
             raise ValueError("报告项目出处重复")
         originals[item["id"]] = item
     evidence = {}
+    excluded = set(reviewed.get("excluded_item_ids", []))
+    all_ids = [item["id"] for item in reviewed_items]
+    if len(all_ids) != len(set(all_ids)) or not excluded.issubset(all_ids):
+        raise ValueError("报告排除项目无效")
     source_kind = ("pdf_text" if report.mime_type == "application/pdf" and
-                   candidate.get("extraction_method") == "deepseek-text" else "model_transcription")
+                   candidate.get("extraction_method") in {"deepseek-text", "fixture-pdf-text"} else "model_transcription")
     for item in reviewed_items:
         if not isinstance(item, dict) or not isinstance(item.get("id"), str):
             raise ValueError("报告核对项目无效")
         item_id = item["id"]
+        if item.get("source_kind") == "manual":
+            if (item_id in originals or not re.fullmatch(r"m-[0-9a-f]{32}", item_id) or item.get("quote") or
+                    (item.get("page") is not None and not 1 <= item["page"] <= report.page_count)):
+                raise ValueError("人工补录项目来源无效")
+            # Human page locations are not extractor evidence. Never send these
+            # additions as if they had immutable text or model-generated citations.
+            continue
         if item_id in evidence or item_id not in originals:
             raise ValueError("报告核对项目无出处")
         original = originals[item_id]
@@ -89,6 +100,8 @@ def build_evidence(report, resident, candidate: dict, reviewed: dict) -> tuple[d
         if any(not isinstance(item.get(field), str) or not isinstance(original.get(field), str)
                for field in ITEM_FIELDS):
             raise ValueError("报告项目核对值无效")
+        if item_id in excluded:
+            continue
         evidence[item_id] = {
             "id": item_id, "report_id": report.id, "revision": report.revision,
             "filename": report.filename, "title": reviewed.get("title") or "报告",
@@ -97,7 +110,7 @@ def build_evidence(report, resident, candidate: dict, reviewed: dict) -> tuple[d
             "edited_fields": [field for field in ITEM_FIELDS if item[field] != original[field]],
             "source_kind": source_kind,
         }
-    if set(evidence) != set(originals):
+    if set(evidence) != set(originals) - excluded or not set(originals).issubset(all_ids):
         raise ValueError("报告核对项目不完整")
     for field, label in HEADER_LABELS.items():
         confirmed = reviewed.get(field)

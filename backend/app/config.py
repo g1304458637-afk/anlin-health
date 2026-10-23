@@ -39,6 +39,7 @@ class Settings:
     deepseek_model: str = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
     report_storage_dir: str = os.getenv("REPORT_STORAGE_DIR", "./private_reports")
     report_worker_enabled: bool = os.getenv("REPORT_WORKER_ENABLED", "true").lower() == "true"
+    plan_worker_enabled: bool = os.getenv("PLAN_WORKER_ENABLED", "true").lower() == "true"
 
 
 settings = Settings()

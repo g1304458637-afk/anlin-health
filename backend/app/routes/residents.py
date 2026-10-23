@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 import re
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
+from sqlalchemy.exc import IntegrityError
 from ..db import get_db
 from ..config import settings
 from ..models import User, Resident, Community, ConsentEvent, ClaimRequest
@@ -180,6 +181,13 @@ def provision_account(body: ProvisionAccountIn, user: User = Depends(require_rol
 
 @router.post("/residents/claim-requests", status_code=202)
 def create_claim_request(body: ClaimRequestIn, request: Request, user: User = Depends(require_roles("resident")), db: Session = Depends(get_db)):
+    version = user.token_version
+    user = db.scalar(select(User).where(User.id == user.id).with_for_update()
+                     .execution_options(populate_existing=True))
+    if not user.is_active or user.token_version != version:
+        raise HTTPException(401, "登录已失效，请重新登录")
+    if user.role != "resident":
+        raise HTTPException(403, "仅居民账号可以申请认领")
     if db.scalar(select(Resident.id).where(Resident.owner_user_id == user.id)):
         raise HTTPException(409, "已有居民档案，无需认领")
     if not claim_limiter.hit(f"claim:{user.id}", 5, window_seconds=3600):
@@ -224,7 +232,8 @@ def list_claim_requests(status: str = Query(default="pending", pattern="^(pendin
 
 @router.post("/community/claim-requests/{claim_id}/review", response_model=ClaimRequestOut)
 def review_claim_request(claim_id: int, body: ClaimReviewIn, user: User = Depends(require_roles("staff")), db: Session = Depends(get_db)):
-    claim = db.get(ClaimRequest, claim_id)
+    claim = db.scalar(select(ClaimRequest).where(ClaimRequest.id == claim_id).with_for_update()
+                      .execution_options(populate_existing=True))
     if not claim:
         raise HTTPException(404, "申请不存在")
     resident = db.get(Resident, claim.resident_id)
@@ -232,19 +241,40 @@ def review_claim_request(claim_id: int, body: ClaimReviewIn, user: User = Depend
         raise HTTPException(404, "申请不存在")
     if claim.status != "pending":
         raise HTTPException(409, "该申请已处理")
-    claim.status = "approved" if body.approve else "rejected"
-    claim.reviewed_by_id = user.id
-    claim.reviewed_at = datetime.now(timezone.utc)
-    claim.note = body.note
     if body.approve:
+        requester = db.scalar(select(User).where(User.id == claim.requester_id).with_for_update()
+                              .execution_options(populate_existing=True))
+        if not requester or not requester.is_active or requester.role != "resident":
+            raise HTTPException(409, "申请人账号状态或身份已变化，请拒绝该申请")
         if resident.owner_user_id is not None:
             raise HTTPException(409, "该档案已被认领")
         owned = db.scalar(select(Resident.id).where(Resident.owner_user_id == claim.requester_id, Resident.id != resident.id))
         if owned:
             raise HTTPException(409, "申请人已有其他档案，请拒绝该申请")
-        resident.owner_user_id = claim.requester_id
-    audit(db, user, "approve_claim" if body.approve else "reject_claim", "claim_request", claim.id)
-    db.commit()
+    try:
+        # Conditional writes also protect SQLite, which ignores FOR UPDATE.
+        reviewed = db.execute(update(ClaimRequest).where(
+            ClaimRequest.id == claim.id, ClaimRequest.status == "pending").values(
+                status="approved" if body.approve else "rejected", reviewed_by_id=user.id,
+                reviewed_at=datetime.now(timezone.utc), note=body.note))
+        if reviewed.rowcount != 1:
+            db.rollback()
+            raise HTTPException(409, "该申请已被其他工作人员处理，请刷新")
+        if body.approve:
+            eligible = select(User.id).where(User.id == claim.requester_id,
+                User.role == "resident", User.is_active.is_(True)).exists()
+            assigned = db.execute(update(Resident).where(
+                Resident.id == resident.id, Resident.owner_user_id.is_(None), eligible
+            ).values(owner_user_id=claim.requester_id))
+            if assigned.rowcount != 1:
+                db.rollback()
+                raise HTTPException(409, "档案归属或申请人状态已变化，请刷新后核验")
+        audit(db, user, "approve_claim" if body.approve else "reject_claim", "claim_request", claim.id)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "申请人已拥有档案或档案状态已变化，请重新核验") from None
+    db.refresh(claim)
     return _claim_out(db, claim)
 
 

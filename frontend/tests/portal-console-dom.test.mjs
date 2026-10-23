@@ -145,7 +145,8 @@ test('console uses aggregate stats and clears role specific data on logout', asy
     if (url === '/api/auth/demo-status') return {body: {enabled: false}};
     if (url === '/api/auth/login') return {body: {access_token: 'staff-token', user: {id: 5, username: 'staff', display_name: '工作人员', role: 'staff', community_id: 1}}};
     if (url.startsWith('/api/community/residents?')) return {body: [{id: 2, name: '居民甲', birth_year: 1950, consent_active: true}]};
-    if (url === '/api/community/visits') return {body: []};
+    if (url.startsWith('/api/community/visits?')) return {body: []};
+    if (url === '/api/community/visits/stats') return {body: {total: 130, planned: 125, done: 5, overdue: 12}};
     if (url === '/api/community/stats') return {body: {resident_count: 1}};
     if (url === '/api/community/consent-reviews') return {body: [{id: 10, resident_id: 2, actor_id: 5, granted: true, evidence_ref: 'PAPER-001', created_at: '2026-10-23T03:00:00Z'}]};
     if (url === '/api/expired') return {status: 401, body: {detail: 'expired'}};
@@ -155,6 +156,7 @@ test('console uses aggregate stats and clears role specific data on logout', asy
   });
   h.element('username').value = 'staff'; h.element('password').value = 'password';
   await h.context.login();
+  assert.equal(h.element('visitCount').textContent, 125);
   h.context.switchView('settings');
   assert.equal(h.element('adminAccountsPanel').classList.contains('hidden'), true);
   h.context.switchView('stats');
@@ -182,6 +184,91 @@ test('console uses aggregate stats and clears role specific data on logout', asy
   assert.equal(h.element('residentRows').innerHTML, '');
   assert.equal(h.element('newResident').disabled, false);
   assert.equal(h.context.anlinAssistantAuth().user, null);
+});
+
+test('console visit totals stay independent of a 25 item page and homepage uses only eight planned visits', async () => {
+  const visits = Array.from({length: 200}, (_, i) => ({id: i + 1, resident_id: 2, staff_id: 5, due_date: '2026-10-23', status: i < 130 ? 'planned' : 'done'}));
+  const h = harness('console', url => {
+    if (url === '/api/auth/demo-status') return {body: {enabled: false}};
+    if (url.startsWith('/api/community/residents?')) return {body: [{id: 2, name: '居民甲', birth_year: 1950, consent_active: true}]};
+    if (url === '/api/community/stats') return {body: {resident_count: 1}};
+    if (url === '/api/community/visits/stats') return {body: {total: 200, planned: 130, done: 70, overdue: 11}};
+    if (url.startsWith('/api/community/visits?')) {
+      const params = new URL(url, 'http://localhost').searchParams;
+      const filtered = visits.filter(v => !params.has('status') || v.status === params.get('status'));
+      const offset = Number(params.get('offset')), limit = Number(params.get('limit'));
+      return {body: filtered.slice(offset, offset + limit)};
+    }
+    throw Error(`unexpected ${url}`);
+  });
+  h.run("token='staff-token';me={id:5,role:'staff',community_id:1};");
+  await h.context.refresh();
+  assert.equal(h.element('visitCount').textContent, 130);
+  assert.equal((h.element('visitRows').innerHTML.match(/class="visit"/g) || []).length, 8);
+  assert.ok(h.requests.some(r => r.url === '/api/community/visits?status=planned&limit=8&offset=0'));
+  h.run("currentView='visits'");
+  await h.context.loadVisitList();
+  assert.match(h.element('visitPageLabel').textContent, /第 1 \/ 6 页 · 共 130 项/);
+  for (let i = 0; i < 5; i++) await h.context.pageVisits(1);
+  assert.equal((h.element('visitList').innerHTML.match(/class="visit"/g) || []).length, 5);
+  assert.equal(h.element('visitCount').textContent, 130);
+  assert.equal(h.element('visitNext').disabled, true);
+  assert.match(h.element('visitSummary').textContent, /待完成 130 · 已完成 70 · 逾期 11/);
+  await h.context.filterVisits('done');
+  assert.match(h.element('visitPageLabel').textContent, /第 1 \/ 3 页 · 共 70 项/);
+  assert.equal(h.element('visitPrev').disabled, true);
+  await h.context.filterVisits('all');
+  assert.match(h.element('visitPageLabel').textContent, /共 200 项/);
+  assert.equal(h.element('visitCount').textContent, 130);
+  assert.equal((h.element('visitRows').innerHTML.match(/class="visit"/g) || []).length, 8);
+  h.context.logout();
+  assert.equal(h.element('visitList').innerHTML, '');
+  assert.equal(h.element('visitSummary').textContent, '');
+});
+
+test('console ignores old visit filter and logged out responses', async () => {
+  let releaseOld;
+  const h = harness('console', url => {
+    if (url === '/api/auth/demo-status') return {body: {enabled: false}};
+    if (url === '/api/community/visits/stats') return {body: {total: 2, planned: 1, done: 1, overdue: 0}};
+    if (url.includes('status=planned')) return new Promise(resolve => { releaseOld = resolve; });
+    if (url.includes('status=done')) return {body: [{id: 22, resident_id: 2, due_date: '2026-10-23', status: 'done'}]};
+    throw Error(`unexpected ${url}`);
+  });
+  h.run("token='staff-token';me={id:5,role:'staff'};currentView='visits';");
+  const old = h.context.loadVisitList();
+  await h.context.filterVisits('done');
+  const expected = h.element('visitList').innerHTML;
+  assert.match(expected, /走访已完成/);
+  releaseOld({body: [{id: 11, resident_id: 3, due_date: '2026-10-23', status: 'planned'}]});
+  await old;
+  assert.equal(h.element('visitList').innerHTML, expected);
+  assert.equal(h.element('visitStatus').value, 'done');
+  const beforeLogout = h.context.filterVisits('planned');
+  h.context.logout();
+  releaseOld({body: [{id: 11, resident_id: 3, due_date: '2026-10-23', status: 'planned'}]});
+  await beforeLogout;
+  assert.equal(h.element('visitList').innerHTML, '');
+  assert.equal(h.element('visitCount').textContent, '—');
+  assert.equal(h.element('visitSummary').textContent, '');
+});
+
+test('console manual vital records submit the actual local measurement time', async () => {
+  let submitted, save, fields;
+  const h = harness('console', (url, options) => {
+    if (url === '/api/auth/demo-status') return {body: {enabled: false}};
+    if (url === '/api/residents/2/vitals') {submitted = JSON.parse(options.body); return {body: {id: 1}};}
+    throw Error(`unexpected ${url}`);
+  });
+  h.run("me={id:5,role:'staff'};residents=[{id:2,name:'居民甲'}];");
+  h.context.modal = (_title, _description, markup, onSubmit) => { fields = markup; save = onSubmit; };
+  h.context.showVital(2);
+  assert.match(fields, /实际测量时间/);
+  assert.match(fields, /name="measured_at" type="datetime-local"/);
+  const local = '2026-01-13T08:15';
+  await save(new Map([['type', 'weight'], ['weight', '65.3'], ['measured_at', local]]));
+  assert.deepEqual(submitted, {type: 'weight', weight_kg: 65.3, measured_at: new Date(local).toISOString()});
+  await assert.rejects(save(new Map([['type', 'weight'], ['weight', '65'], ['measured_at', '']])), /有效的实际测量时间/);
 });
 
 test('admin can create fixed staff accounts and manage only nonadmin users', async () => {
