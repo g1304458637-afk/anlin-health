@@ -1,5 +1,6 @@
 """Production configuration guards and database migration round-trip."""
 import sqlite3
+import base64
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,7 +13,7 @@ from app.config import validate_settings
 def _prod_settings(**overrides):
     base = dict(app_env="production", secret_key="x" * 48, demo_auth=False,
                 database_url="postgresql+psycopg://u:p@localhost:5432/ch",
-                allowed_hosts=("health.example.org",), field_encryption_key="A" * 43)
+                allowed_hosts=("health.example.org",), field_encryption_key=base64.b64encode(b"x" * 32).decode())
     base.update(overrides)
     return SimpleNamespace(**base)
 
@@ -28,6 +29,9 @@ def test_production_settings_reject_insecure_config(monkeypatch):
         ("sqlite in production", {"database_url": "sqlite:///./dev.db"}),
         ("missing allowed hosts", {"allowed_hosts": ()}),
         ("missing encryption key", {"field_encryption_key": ""}),
+        ("invalid encryption key", {"field_encryption_key": "not-base64!!!"}),
+        ("short encryption key", {"field_encryption_key": base64.b64encode(b"short").decode()}),
+        ("non-PostgreSQL database", {"database_url": "mysql://u:p@localhost/ch"}),
     ]:
         monkeypatch.setattr(config_mod, "settings", _prod_settings(**override))
         try:

@@ -28,7 +28,7 @@ def db():
         b = Community(name="演示社区二")
         session.add_all([a,b]); session.flush()
         users = []
-        for username,role,c in [('resident','resident',None),('family','family',None),('staff','staff',a.id),('staff2','staff',b.id),('admin','admin',None),('unlinked','resident',None)]:
+        for username,role,c in [('resident','resident',None),('family','family',None),('staff','staff',a.id),('staff2','staff',b.id),('admin','admin',None),('unlinked','resident',None),('staff_peer','staff',a.id)]:
             users.append(User(username=username, display_name=username, role=role, community_id=c,
                 invite_code=new_invite_code(), password_hash=HASH))
         session.add_all(users);session.flush()

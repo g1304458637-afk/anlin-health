@@ -39,8 +39,9 @@ def consent_active(db: Session, resident_id: int) -> bool:
     ev = db.scalar(select(ConsentEvent).where(ConsentEvent.resident_id == resident_id, ConsentEvent.purpose == "community_care").order_by(ConsentEvent.id.desc()).limit(1))
     if not ev or not ev.granted:
         return False
-    # A reviewed-and-rejected paper consent cuts staff access immediately.
-    return ev.review_status != "rejected"
+    # The latest consent decision is authoritative. An unreviewed paper event
+    # cannot revive access after a resident has withdrawn consent.
+    return ev.review_status == "approved"
 
 
 def is_owner(user: User, resident: Resident) -> bool:

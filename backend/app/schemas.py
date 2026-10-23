@@ -23,6 +23,21 @@ class PasswordChangeIn(Model):
     new_password: str = Field(min_length=1, max_length=200)
 
 
+class TotpSetupIn(Model):
+    current_password: str = Field(min_length=1, max_length=200)
+    totp_code: str | None = Field(default=None, min_length=6, max_length=6)
+
+
+class TotpConfirmIn(Model):
+    current_password: str = Field(min_length=1, max_length=200)
+    totp_code: str = Field(min_length=6, max_length=6)
+
+
+class TotpDisableIn(Model):
+    current_password: str = Field(min_length=1, max_length=200)
+    totp_code: str = Field(min_length=6, max_length=6)
+
+
 class WxLoginIn(Model):
     code: str = Field(min_length=5, max_length=512)
 
@@ -36,6 +51,13 @@ class RegisterFamilyIn(Model):
 class ProvisionAccountIn(Model):
     username: str = Field(min_length=4, max_length=40)
     display_name: str = Field(min_length=2, max_length=40)
+    initial_password: str = Field(min_length=1, max_length=200)
+
+
+class CreateStaffIn(Model):
+    username: str = Field(min_length=4, max_length=40)
+    display_name: str = Field(min_length=2, max_length=40)
+    community_id: int = Field(ge=1)
     initial_password: str = Field(min_length=1, max_length=200)
 
 
@@ -83,6 +105,12 @@ class ResidentPatch(Model):
     sex: Literal["male", "female", "undisclosed"] | None = None
     phone: str | None = Field(default=None, max_length=30)
 
+    @model_validator(mode="after")
+    def reject_null_required_fields(self):
+        if any(getattr(self, field) is None for field in self.model_fields_set & {"name", "birth_year", "sex"}):
+            raise ValueError("姓名、出生年份和性别不能设为空")
+        return self
+
 
 class ResidentOut(Model):
     id: int
@@ -102,6 +130,7 @@ class ConsentIn(Model):
 
 class ConsentOut(Model):
     id: int
+    actor_id: int
     resident_id: int
     granted: bool
     purpose: str

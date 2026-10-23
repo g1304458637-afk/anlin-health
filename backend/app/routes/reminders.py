@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from ..db import get_db
@@ -11,9 +11,12 @@ router = APIRouter(prefix="/api", tags=["reminders"])
 
 
 @router.get("/residents/{resident_id}/reminders", response_model=list[ReminderOut])
-def list_reminders(resident_id: int, user: User = Depends(auth_user), db: Session = Depends(get_db)):
+def list_reminders(resident_id: int, limit: int = Query(default=100, ge=1, le=100), offset: int = Query(default=0, ge=0), pending_only: bool = False, user: User = Depends(auth_user), db: Session = Depends(get_db)):
     check_access(db, user, db.get(Resident, resident_id), scope="reminders")
-    return db.scalars(select(Reminder).where(Reminder.resident_id == resident_id).order_by(Reminder.due_date.asc(), Reminder.id.desc()).limit(100)).all()
+    query = select(Reminder).where(Reminder.resident_id == resident_id)
+    if pending_only:
+        query = query.where(Reminder.completed_at.is_(None))
+    return db.scalars(query.order_by(Reminder.completed_at.is_not(None), Reminder.due_date.asc(), Reminder.id.desc()).offset(offset).limit(limit)).all()
 
 
 @router.post("/residents/{resident_id}/reminders", response_model=ReminderOut, status_code=201)

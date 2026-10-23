@@ -9,6 +9,7 @@ from ..models import User, Resident, Community, ConsentEvent, ClaimRequest
 from ..deps import auth_user, require_roles, check_access, is_owner, is_staff_for, consent_active, audit
 from ..ratelimit import claim_limiter, provision_limiter, client_ip
 from ..security import validate_password_strength, hash_password, new_invite_code
+from ..reporting import visible_resident_ids
 from ..schemas import (ResidentOut, SelfResidentIn, AssistedResidentIn, ResidentPatch, ConsentIn, ConsentOut,
                        ConsentReviewIn, ClaimRequestIn, ClaimRequestOut, ClaimReviewIn, ProvisionAccountIn)
 
@@ -58,13 +59,13 @@ def create_my_resident(body: SelfResidentIn, user: User = Depends(require_roles(
 
 @router.get("/community/residents", response_model=list[ResidentOut])
 def list_community_residents(q: str = Query(default="", max_length=80), limit: int = Query(default=50, ge=1, le=100), offset: int = Query(default=0, ge=0), user: User = Depends(require_roles("staff")), db: Session = Depends(get_db)):
-    query = select(Resident).where(Resident.community_id == user.community_id)
+    query = select(Resident).where(Resident.id.in_(visible_resident_ids(user.community_id)))
     if q.strip():
         safe_q = q.strip().replace("%", r"\%").replace("_", r"\_")
         query = query.where(Resident.name.ilike(f"%{safe_q}%", escape="\\"))
     items = db.scalars(query.order_by(Resident.id.desc()).offset(offset).limit(limit)).all()
-    # Processing consent is necessary before presenting residents' health information.
-    return [serialize(db, r, user) for r in items if consent_active(db, r.id)]
+    # Filter before paging, so inaccessible records cannot hide later valid rows.
+    return [serialize(db, r, user) for r in items]
 
 
 @router.post("/community/residents", response_model=ResidentOut, status_code=201)
@@ -269,6 +270,8 @@ def review_consent_event(event_id: int, body: ConsentReviewIn, user: User = Depe
         raise HTTPException(404, "记录不存在")
     if event.review_status != "pending":
         raise HTTPException(409, "该记录已复核")
+    if event.actor_id == user.id:
+        raise HTTPException(403, "不能复核自己提交的纸质同意记录")
     event.review_status = "approved" if body.approve else "rejected"
     event.review_note = body.note
     event.reviewed_by_id = user.id

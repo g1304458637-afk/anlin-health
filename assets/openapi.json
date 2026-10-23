@@ -1,3516 +1,4817 @@
 {
- "openapi": "3.1.0",
- "info": {
-  "title": "社区健康管理 API（试点工程）",
-  "description": "供社区和居民使用的健康记录与日常关怀试点系统。非医疗诊断产品。",
-  "version": "0.2.0"
- },
- "paths": {
-  "/api/auth/login": {
-   "post": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Login",
-    "description": "Production-capable username/password login (staff provisioned out-of-band).\n\nDefenses: per-account+IP rate limit, per-account lockout after repeated\nfailures, optional TOTP second factor, deactivation check, audit trail.",
-    "operationId": "login_api_auth_login_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/LoginIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
+  "openapi": "3.1.0",
+  "info": {
+    "title": "社区健康管理 API（试点工程）",
+    "description": "供社区和居民使用的健康记录与日常关怀试点系统。非医疗诊断产品。",
+    "version": "0.6.0"
   },
-  "/api/auth/login/totp": {
-   "post": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Login Totp",
-    "operationId": "login_totp_api_auth_login_totp_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/TotpLoginIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/auth/dev-login": {
-   "post": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Dev Login",
-    "operationId": "dev_login_api_auth_dev_login_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/LoginIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/auth/demo-status": {
-   "get": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Demo Status",
-    "operationId": "demo_status_api_auth_demo_status_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/auth/change-password": {
-   "post": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Change Password",
-    "operationId": "change_password_api_auth_change_password_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/PasswordChangeIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/auth/logout-all": {
-   "post": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Logout All",
-    "operationId": "logout_all_api_auth_logout_all_post",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/auth/mfa/totp": {
-   "post": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Setup Totp",
-    "description": "Provision (or rotate) a TOTP secret; the secret is shown exactly once.",
-    "operationId": "setup_totp_api_auth_mfa_totp_post",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   },
-   "delete": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Disable Totp",
-    "operationId": "disable_totp_api_auth_mfa_totp_delete",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/auth/wechat": {
-   "post": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Wechat Login",
-    "operationId": "wechat_login_api_auth_wechat_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/WxLoginIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/me": {
-   "get": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Me",
-    "operationId": "me_api_me_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/UserOut"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/me/family-mode": {
-   "post": {
-    "tags": [
-     "auth"
-    ],
-    "summary": "Family Mode",
-    "operationId": "family_mode_api_me_family_mode_post",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/UserOut"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/communities": {
-   "get": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Communities",
-    "operationId": "communities_api_communities_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/residents/me": {
-   "get": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "My Resident",
-    "operationId": "my_resident_api_residents_me_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ResidentOut"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   },
-   "post": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Create My Resident",
-    "operationId": "create_my_resident_api_residents_me_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/SelfResidentIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "201": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ResidentOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/community/residents": {
-   "get": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "List Community Residents",
-    "operationId": "list_community_residents_api_community_residents_get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "q",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "type": "string",
-       "maxLength": 80,
-       "default": "",
-       "title": "Q"
-      }
-     },
-     {
-      "name": "limit",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "type": "integer",
-       "maximum": 100,
-       "minimum": 1,
-       "default": 50,
-       "title": "Limit"
-      }
-     },
-     {
-      "name": "offset",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "type": "integer",
-       "minimum": 0,
-       "default": 0,
-       "title": "Offset"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "type": "array",
-         "items": {
-          "$ref": "#/components/schemas/ResidentOut"
-         },
-         "title": "Response List Community Residents Api Community Residents Get"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   },
-   "post": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Create Assisted Resident",
-    "operationId": "create_assisted_resident_api_community_residents_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/AssistedResidentIn"
-       }
-      }
-     }
-    },
-    "responses": {
-     "201": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ResidentOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/residents/{resident_id}": {
-   "get": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Get Resident",
-    "operationId": "get_resident_api_residents__resident_id__get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ResidentOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   },
-   "patch": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Update Resident",
-    "operationId": "update_resident_api_residents__resident_id__patch",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/ResidentPatch"
-       }
-      }
-     }
-    },
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ResidentOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/residents/{resident_id}/consents": {
-   "get": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Consents",
-    "operationId": "consents_api_residents__resident_id__consents_get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "type": "array",
-         "items": {
-          "$ref": "#/components/schemas/ConsentOut"
-         },
-         "title": "Response Consents Api Residents  Resident Id  Consents Get"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   },
-   "post": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Update Consent",
-    "operationId": "update_consent_api_residents__resident_id__consents_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/ConsentIn"
-       }
-      }
-     }
-    },
-    "responses": {
-     "201": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ConsentOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/community/stats": {
-   "get": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Community Stats",
-    "operationId": "community_stats_api_community_stats_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/residents/claim-requests": {
-   "post": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Create Claim Request",
-    "operationId": "create_claim_request_api_residents_claim_requests_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/ClaimRequestIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "202": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/community/claim-requests": {
-   "get": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "List Claim Requests",
-    "operationId": "list_claim_requests_api_community_claim_requests_get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "status",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "type": "string",
-       "pattern": "^(pending|approved|rejected)$",
-       "default": "pending",
-       "title": "Status"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "type": "array",
-         "items": {
-          "$ref": "#/components/schemas/ClaimRequestOut"
-         },
-         "title": "Response List Claim Requests Api Community Claim Requests Get"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/community/claim-requests/{claim_id}/review": {
-   "post": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Review Claim Request",
-    "operationId": "review_claim_request_api_community_claim_requests__claim_id__review_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "claim_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Claim Id"
-      }
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/ClaimReviewIn"
-       }
-      }
-     }
-    },
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ClaimRequestOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/community/consent-reviews": {
-   "get": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Pending Consent Reviews",
-    "operationId": "pending_consent_reviews_api_community_consent_reviews_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "items": {
-          "$ref": "#/components/schemas/ConsentOut"
-         },
-         "type": "array",
-         "title": "Response Pending Consent Reviews Api Community Consent Reviews Get"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/community/consent-events/{event_id}/review": {
-   "post": {
-    "tags": [
-     "residents"
-    ],
-    "summary": "Review Consent Event",
-    "operationId": "review_consent_event_api_community_consent_events__event_id__review_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "event_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Event Id"
-      }
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/ConsentReviewIn"
-       }
-      }
-     }
-    },
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ConsentOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/residents/{resident_id}/vitals": {
-   "get": {
-    "tags": [
-     "vitals"
-    ],
-    "summary": "List Vitals",
-    "operationId": "list_vitals_api_residents__resident_id__vitals_get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     },
-     {
-      "name": "metric",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "anyOf": [
-        {
-         "type": "string",
-         "pattern": "^(blood_pressure|blood_glucose|weight)$"
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "description": "Production-capable username/password login (staff provisioned out-of-band).\n\nDefenses: per-account+IP rate limit, per-account lockout after repeated\nfailures, optional TOTP second factor, deactivation check, audit trail.",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
         },
-        {
-         "type": "null"
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
         }
-       ],
-       "title": "Metric"
       }
-     },
-     {
-      "name": "limit",
-      "in": "query",
-      "required": false,
-      "schema": {
-       "type": "integer",
-       "maximum": 100,
-       "minimum": 1,
-       "default": 50,
-       "title": "Limit"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "type": "array",
-         "items": {
-          "$ref": "#/components/schemas/VitalOut"
-         },
-         "title": "Response List Vitals Api Residents  Resident Id  Vitals Get"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   },
-   "post": {
-    "tags": [
-     "vitals"
-    ],
-    "summary": "Create Vital",
-    "operationId": "create_vital_api_residents__resident_id__vitals_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/VitalIn"
-       }
-      }
-     }
     },
-    "responses": {
-     "201": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/VitalOut"
+    "/api/auth/login/totp": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login Totp",
+        "operationId": "login_totp_api_auth_login_totp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpLoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
         }
-       }
       }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/residents/{resident_id}/vitals/{vital_id}": {
-   "delete": {
-    "tags": [
-     "vitals"
-    ],
-    "summary": "Delete Vital",
-    "operationId": "delete_vital_api_residents__resident_id__vitals__vital_id__delete",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     },
-     {
-      "name": "vital_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Vital Id"
-      }
-     }
-    ],
-    "responses": {
-     "204": {
-      "description": "Successful Response"
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/questionnaires": {
-   "get": {
-    "tags": [
-     "questionnaires"
-    ],
-    "summary": "List Questionnaires",
-    "operationId": "list_questionnaires_api_questionnaires_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "items": {
-          "$ref": "#/components/schemas/QuestionnaireOut"
-         },
-         "type": "array",
-         "title": "Response List Questionnaires Api Questionnaires Get"
-        }
-       }
-      }
-     }
     },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/questionnaires/{questionnaire_id}": {
-   "get": {
-    "tags": [
-     "questionnaires"
-    ],
-    "summary": "Get Questionnaire",
-    "operationId": "get_questionnaire_api_questionnaires__questionnaire_id__get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "questionnaire_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Questionnaire Id"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/QuestionnaireOut"
+    "/api/auth/dev-login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Dev Login",
+        "operationId": "dev_login_api_auth_dev_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
         }
-       }
       }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
+    },
+    "/api/auth/demo-status": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Demo Status",
+        "operationId": "demo_status_api_auth_demo_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
         }
-       }
       }
-     }
-    }
-   }
-  },
-  "/api/residents/{resident_id}/responses": {
-   "post": {
-    "tags": [
-     "questionnaires"
-    ],
-    "summary": "Submit Responses",
-    "operationId": "submit_responses_api_residents__resident_id__responses_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/AnswersIn"
-       }
-      }
-     }
     },
-    "responses": {
-     "201": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ResponseOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   },
-   "get": {
-    "tags": [
-     "questionnaires"
-    ],
-    "summary": "My Responses",
-    "operationId": "my_responses_api_residents__resident_id__responses_get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "type": "array",
-         "items": {
-          "$ref": "#/components/schemas/ResponseOut"
-         },
-         "title": "Response My Responses Api Residents  Resident Id  Responses Get"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/residents/{resident_id}/reminders": {
-   "get": {
-    "tags": [
-     "reminders"
-    ],
-    "summary": "List Reminders",
-    "operationId": "list_reminders_api_residents__resident_id__reminders_get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "type": "array",
-         "items": {
-          "$ref": "#/components/schemas/ReminderOut"
-         },
-         "title": "Response List Reminders Api Residents  Resident Id  Reminders Get"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   },
-   "post": {
-    "tags": [
-     "reminders"
-    ],
-    "summary": "Create Reminder",
-    "operationId": "create_reminder_api_residents__resident_id__reminders_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/ReminderIn"
-       }
-      }
-     }
-    },
-    "responses": {
-     "201": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ReminderOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/residents/{resident_id}/reminders/{reminder_id}/complete": {
-   "patch": {
-    "tags": [
-     "reminders"
-    ],
-    "summary": "Complete Reminder",
-    "operationId": "complete_reminder_api_residents__resident_id__reminders__reminder_id__complete_patch",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     },
-     {
-      "name": "reminder_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Reminder Id"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ReminderOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/me/invite-code/rotate": {
-   "post": {
-    "tags": [
-     "family"
-    ],
-    "summary": "Rotate Invite Code",
-    "description": "Replace the user's family invite code; the old code stops working immediately.",
-    "operationId": "rotate_invite_code_api_me_invite_code_rotate_post",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/residents/{resident_id}/family-grants": {
-   "post": {
-    "tags": [
-     "family"
-    ],
-    "summary": "Grant Family",
-    "operationId": "grant_family_api_residents__resident_id__family_grants_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/FamilyGrantIn"
-       }
-      }
-     }
-    },
-    "responses": {
-     "201": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/FamilyGrantOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   },
-   "get": {
-    "tags": [
-     "family"
-    ],
-    "summary": "List Family Grants",
-    "operationId": "list_family_grants_api_residents__resident_id__family_grants_get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "type": "array",
-         "items": {
-          "$ref": "#/components/schemas/FamilyGrantOut"
-         },
-         "title": "Response List Family Grants Api Residents  Resident Id  Family Grants Get"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/residents/{resident_id}/family-grants/{grant_id}": {
-   "delete": {
-    "tags": [
-     "family"
-    ],
-    "summary": "Revoke Family",
-    "operationId": "revoke_family_api_residents__resident_id__family_grants__grant_id__delete",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     },
-     {
-      "name": "grant_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Grant Id"
-      }
-     }
-    ],
-    "responses": {
-     "204": {
-      "description": "Successful Response"
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/residents/{resident_id}/family-grants/{grant_id}/decline": {
-   "post": {
-    "tags": [
-     "family"
-    ],
-    "summary": "Decline Family Grant",
-    "description": "Grantee-side refusal: the invited family member can reject a grant made to them.",
-    "operationId": "decline_family_grant_api_residents__resident_id__family_grants__grant_id__decline_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     },
-     {
-      "name": "grant_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Grant Id"
-      }
-     }
-    ],
-    "responses": {
-     "204": {
-      "description": "Successful Response"
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/family/shared-residents": {
-   "get": {
-    "tags": [
-     "family"
-    ],
-    "summary": "Shared Residents",
-    "operationId": "shared_residents_api_family_shared_residents_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/community/visits": {
-   "get": {
-    "tags": [
-     "visits"
-    ],
-    "summary": "Staff Visits",
-    "operationId": "staff_visits_api_community_visits_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "items": {
-          "$ref": "#/components/schemas/VisitOut"
-         },
-         "type": "array",
-         "title": "Response Staff Visits Api Community Visits Get"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   },
-   "post": {
-    "tags": [
-     "visits"
-    ],
-    "summary": "Create Visit",
-    "operationId": "create_visit_api_community_visits_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/VisitIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "201": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/VisitOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/community/visits/{visit_id}/finish": {
-   "patch": {
-    "tags": [
-     "visits"
-    ],
-    "summary": "Finish Visit",
-    "operationId": "finish_visit_api_community_visits__visit_id__finish_patch",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "visit_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Visit Id"
-      }
-     }
-    ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/VisitFinish"
-       }
-      }
-     }
-    },
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/VisitOut"
-        }
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/residents/{resident_id}/visits": {
-   "get": {
-    "tags": [
-     "visits"
-    ],
-    "summary": "Self Visits",
-    "operationId": "self_visits_api_residents__resident_id__visits_get",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "resident_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "Resident Id"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/admin/summary": {
-   "get": {
-    "tags": [
-     "visits"
-    ],
-    "summary": "Admin Summary",
-    "operationId": "admin_summary_api_admin_summary_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/admin/users": {
-   "get": {
-    "tags": [
-     "admin"
-    ],
-    "summary": "List Users",
-    "operationId": "list_users_api_admin_users_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "items": {
-          "$ref": "#/components/schemas/AdminUserOut"
-         },
-         "type": "array",
-         "title": "Response List Users Api Admin Users Get"
-        }
-       }
-      }
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ]
-   }
-  },
-  "/api/admin/users/{user_id}/deactivate": {
-   "post": {
-    "tags": [
-     "admin"
-    ],
-    "summary": "Deactivate User",
-    "operationId": "deactivate_user_api_admin_users__user_id__deactivate_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "user_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "User Id"
-      }
-     }
-    ],
-    "responses": {
-     "204": {
-      "description": "Successful Response"
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/api/admin/users/{user_id}/activate": {
-   "post": {
-    "tags": [
-     "admin"
-    ],
-    "summary": "Activate User",
-    "operationId": "activate_user_api_admin_users__user_id__activate_post",
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "parameters": [
-     {
-      "name": "user_id",
-      "in": "path",
-      "required": true,
-      "schema": {
-       "type": "integer",
-       "title": "User Id"
-      }
-     }
-    ],
-    "responses": {
-     "204": {
-      "description": "Successful Response"
-     },
-     "422": {
-      "description": "Validation Error",
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/healthz": {
-   "get": {
-    "tags": [
-     "operations"
-    ],
-    "summary": "Health",
-    "operationId": "health_healthz_get",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {}
-       }
-      }
-     }
-    }
-   }
-  }
- },
- "components": {
-  "schemas": {
-   "AdminUserOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "username": {
-      "type": "string",
-      "title": "Username"
-     },
-     "display_name": {
-      "type": "string",
-      "title": "Display Name"
-     },
-     "role": {
-      "type": "string",
-      "title": "Role"
-     },
-     "community_id": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Community Id"
-     },
-     "is_active": {
-      "type": "boolean",
-      "title": "Is Active"
-     },
-     "mfa_enabled": {
-      "type": "boolean",
-      "title": "Mfa Enabled"
-     },
-     "last_login_at": {
-      "anyOf": [
-       {
-        "type": "string",
-        "format": "date-time"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Last Login At"
-     },
-     "password_updated_at": {
-      "anyOf": [
-       {
-        "type": "string",
-        "format": "date-time"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Password Updated At"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "username",
-     "display_name",
-     "role",
-     "community_id",
-     "is_active",
-     "mfa_enabled",
-     "last_login_at",
-     "password_updated_at"
-    ],
-    "title": "AdminUserOut"
-   },
-   "AnswersIn": {
-    "properties": {
-     "questionnaire_id": {
-      "type": "integer",
-      "title": "Questionnaire Id"
-     },
-     "answers": {
-      "additionalProperties": {
-       "type": "string"
-      },
-      "type": "object",
-      "maxProperties": 40,
-      "minProperties": 1,
-      "title": "Answers"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "questionnaire_id",
-     "answers"
-    ],
-    "title": "AnswersIn"
-   },
-   "AssistedResidentIn": {
-    "properties": {
-     "name": {
-      "type": "string",
-      "maxLength": 80,
-      "minLength": 2,
-      "title": "Name"
-     },
-     "birth_year": {
-      "type": "integer",
-      "maximum": 2100.0,
-      "minimum": 1900.0,
-      "title": "Birth Year"
-     },
-     "sex": {
-      "type": "string",
-      "enum": [
-       "male",
-       "female",
-       "undisclosed"
-      ],
-      "title": "Sex",
-      "default": "undisclosed"
-     },
-     "phone": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 30
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Phone"
-     },
-     "community_id": {
-      "type": "integer",
-      "minimum": 1.0,
-      "title": "Community Id"
-     },
-     "consent_confirmed": {
-      "type": "boolean",
-      "title": "Consent Confirmed"
-     },
-     "evidence_ref": {
-      "type": "string",
-      "maxLength": 200,
-      "minLength": 5,
-      "title": "Evidence Ref"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "name",
-     "birth_year",
-     "community_id",
-     "consent_confirmed",
-     "evidence_ref"
-    ],
-    "title": "AssistedResidentIn"
-   },
-   "ClaimRequestIn": {
-    "properties": {
-     "resident_id": {
-      "type": "integer",
-      "minimum": 1.0,
-      "title": "Resident Id"
-     },
-     "full_name": {
-      "type": "string",
-      "maxLength": 80,
-      "minLength": 2,
-      "title": "Full Name"
-     },
-     "phone": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 30
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Phone"
-     },
-     "note": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 300
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Note"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "resident_id",
-     "full_name"
-    ],
-    "title": "ClaimRequestIn"
-   },
-   "ClaimRequestOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "resident_id": {
-      "type": "integer",
-      "title": "Resident Id"
-     },
-     "requester_id": {
-      "type": "integer",
-      "title": "Requester Id"
-     },
-     "requester_name": {
-      "type": "string",
-      "title": "Requester Name"
-     },
-     "status": {
-      "type": "string",
-      "title": "Status"
-     },
-     "stated_name": {
-      "type": "string",
-      "title": "Stated Name"
-     },
-     "stated_phone": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Stated Phone"
-     },
-     "name_matched": {
-      "type": "boolean",
-      "title": "Name Matched"
-     },
-     "phone_matched": {
-      "type": "boolean",
-      "title": "Phone Matched"
-     },
-     "note": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Note"
-     },
-     "reviewed_at": {
-      "anyOf": [
-       {
-        "type": "string",
-        "format": "date-time"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Reviewed At"
-     },
-     "created_at": {
-      "type": "string",
-      "format": "date-time",
-      "title": "Created At"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "resident_id",
-     "requester_id",
-     "requester_name",
-     "status",
-     "stated_name",
-     "stated_phone",
-     "name_matched",
-     "phone_matched",
-     "note",
-     "reviewed_at",
-     "created_at"
-    ],
-    "title": "ClaimRequestOut"
-   },
-   "ClaimReviewIn": {
-    "properties": {
-     "approve": {
-      "type": "boolean",
-      "title": "Approve"
-     },
-     "note": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 300
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Note"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "approve"
-    ],
-    "title": "ClaimReviewIn"
-   },
-   "ConsentIn": {
-    "properties": {
-     "granted": {
-      "type": "boolean",
-      "title": "Granted"
-     },
-     "evidence_ref": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 200
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Evidence Ref"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "granted"
-    ],
-    "title": "ConsentIn"
-   },
-   "ConsentOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "granted": {
-      "type": "boolean",
-      "title": "Granted"
-     },
-     "purpose": {
-      "type": "string",
-      "title": "Purpose"
-     },
-     "method": {
-      "type": "string",
-      "title": "Method"
-     },
-     "evidence_ref": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Evidence Ref"
-     },
-     "review_status": {
-      "type": "string",
-      "title": "Review Status",
-      "default": "approved"
-     },
-     "review_note": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Review Note"
-     },
-     "reviewed_at": {
-      "anyOf": [
-       {
-        "type": "string",
-        "format": "date-time"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Reviewed At"
-     },
-     "created_at": {
-      "type": "string",
-      "format": "date-time",
-      "title": "Created At"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "granted",
-     "purpose",
-     "method",
-     "evidence_ref",
-     "created_at"
-    ],
-    "title": "ConsentOut"
-   },
-   "ConsentReviewIn": {
-    "properties": {
-     "approve": {
-      "type": "boolean",
-      "title": "Approve"
-     },
-     "note": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 300
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Note"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "approve"
-    ],
-    "title": "ConsentReviewIn"
-   },
-   "FamilyGrantIn": {
-    "properties": {
-     "invite_code": {
-      "type": "string",
-      "maxLength": 32,
-      "minLength": 10,
-      "title": "Invite Code"
-     },
-     "can_profile": {
-      "type": "boolean",
-      "title": "Can Profile",
-      "default": true
-     },
-     "can_vitals": {
-      "type": "boolean",
-      "title": "Can Vitals",
-      "default": true
-     },
-     "expires_in_days": {
-      "type": "integer",
-      "maximum": 365.0,
-      "minimum": 1.0,
-      "title": "Expires In Days",
-      "default": 30
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "invite_code"
-    ],
-    "title": "FamilyGrantIn"
-   },
-   "FamilyGrantOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "resident_id": {
-      "type": "integer",
-      "title": "Resident Id"
-     },
-     "grantee_id": {
-      "type": "integer",
-      "title": "Grantee Id"
-     },
-     "grantee_name": {
-      "type": "string",
-      "title": "Grantee Name"
-     },
-     "can_profile": {
-      "type": "boolean",
-      "title": "Can Profile"
-     },
-     "can_vitals": {
-      "type": "boolean",
-      "title": "Can Vitals"
-     },
-     "expires_at": {
-      "type": "string",
-      "format": "date-time",
-      "title": "Expires At"
-     },
-     "revoked_at": {
-      "anyOf": [
-       {
-        "type": "string",
-        "format": "date-time"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Revoked At"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "resident_id",
-     "grantee_id",
-     "grantee_name",
-     "can_profile",
-     "can_vitals",
-     "expires_at",
-     "revoked_at"
-    ],
-    "title": "FamilyGrantOut"
-   },
-   "HTTPValidationError": {
-    "properties": {
-     "detail": {
-      "items": {
-       "$ref": "#/components/schemas/ValidationError"
-      },
-      "type": "array",
-      "title": "Detail"
-     }
-    },
-    "type": "object",
-    "title": "HTTPValidationError"
-   },
-   "LoginIn": {
-    "properties": {
-     "username": {
-      "type": "string",
-      "maxLength": 80,
-      "minLength": 1,
-      "title": "Username"
-     },
-     "password": {
-      "type": "string",
-      "maxLength": 200,
-      "minLength": 1,
-      "title": "Password"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "username",
-     "password"
-    ],
-    "title": "LoginIn"
-   },
-   "PasswordChangeIn": {
-    "properties": {
-     "current_password": {
-      "type": "string",
-      "maxLength": 200,
-      "minLength": 1,
-      "title": "Current Password"
-     },
-     "new_password": {
-      "type": "string",
-      "maxLength": 200,
-      "minLength": 1,
-      "title": "New Password"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "current_password",
-     "new_password"
-    ],
-    "title": "PasswordChangeIn"
-   },
-   "QuestionnaireOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "slug": {
-      "type": "string",
-      "title": "Slug"
-     },
-     "title": {
-      "type": "string",
-      "title": "Title"
-     },
-     "version": {
-      "type": "integer",
-      "title": "Version"
-     },
-     "category": {
-      "type": "string",
-      "title": "Category"
-     },
-     "questions": {
-      "items": {},
-      "type": "array",
-      "title": "Questions"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "slug",
-     "title",
-     "version",
-     "category",
-     "questions"
-    ],
-    "title": "QuestionnaireOut"
-   },
-   "ReminderIn": {
-    "properties": {
-     "type": {
-      "type": "string",
-      "enum": [
-       "measure",
-       "questionnaire",
-       "followup"
-      ],
-      "title": "Type"
-     },
-     "title": {
-      "type": "string",
-      "maxLength": 120,
-      "minLength": 2,
-      "title": "Title"
-     },
-     "due_date": {
-      "type": "string",
-      "format": "date",
-      "title": "Due Date"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "type",
-     "title",
-     "due_date"
-    ],
-    "title": "ReminderIn"
-   },
-   "ReminderOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "resident_id": {
-      "type": "integer",
-      "title": "Resident Id"
-     },
-     "type": {
-      "type": "string",
-      "title": "Type"
-     },
-     "title": {
-      "type": "string",
-      "title": "Title"
-     },
-     "due_date": {
-      "type": "string",
-      "format": "date",
-      "title": "Due Date"
-     },
-     "completed_at": {
-      "anyOf": [
-       {
-        "type": "string",
-        "format": "date-time"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Completed At"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "resident_id",
-     "type",
-     "title",
-     "due_date",
-     "completed_at"
-    ],
-    "title": "ReminderOut"
-   },
-   "ResidentOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "name": {
-      "type": "string",
-      "title": "Name"
-     },
-     "birth_year": {
-      "type": "integer",
-      "title": "Birth Year"
-     },
-     "sex": {
-      "type": "string",
-      "title": "Sex"
-     },
-     "phone": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Phone"
-     },
-     "community_id": {
-      "type": "integer",
-      "title": "Community Id"
-     },
-     "owner_user_id": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Owner User Id"
-     },
-     "consent_active": {
-      "anyOf": [
-       {
-        "type": "boolean"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Consent Active"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "name",
-     "birth_year",
-     "sex",
-     "phone",
-     "community_id",
-     "owner_user_id"
-    ],
-    "title": "ResidentOut"
-   },
-   "ResidentPatch": {
-    "properties": {
-     "name": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 80,
-        "minLength": 2
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Name"
-     },
-     "birth_year": {
-      "anyOf": [
-       {
-        "type": "integer",
-        "maximum": 2100.0,
-        "minimum": 1900.0
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Birth Year"
-     },
-     "sex": {
-      "anyOf": [
-       {
-        "type": "string",
-        "enum": [
-         "male",
-         "female",
-         "undisclosed"
+    "/api/auth/change-password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change Password",
+        "operationId": "change_password_api_auth_change_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChangeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
         ]
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Sex"
-     },
-     "phone": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 30
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Phone"
-     }
+      }
     },
-    "additionalProperties": false,
-    "type": "object",
-    "title": "ResidentPatch"
-   },
-   "ResponseOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "resident_id": {
-      "type": "integer",
-      "title": "Resident Id"
-     },
-     "questionnaire_id": {
-      "type": "integer",
-      "title": "Questionnaire Id"
-     },
-     "questionnaire_version": {
-      "type": "integer",
-      "title": "Questionnaire Version"
-     },
-     "answers": {
-      "additionalProperties": true,
-      "type": "object",
-      "title": "Answers"
-     },
-     "created_at": {
-      "type": "string",
-      "format": "date-time",
-      "title": "Created At"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "resident_id",
-     "questionnaire_id",
-     "questionnaire_version",
-     "answers",
-     "created_at"
-    ],
-    "title": "ResponseOut"
-   },
-   "SelfResidentIn": {
-    "properties": {
-     "name": {
-      "type": "string",
-      "maxLength": 80,
-      "minLength": 2,
-      "title": "Name"
-     },
-     "birth_year": {
-      "type": "integer",
-      "maximum": 2100.0,
-      "minimum": 1900.0,
-      "title": "Birth Year"
-     },
-     "sex": {
-      "type": "string",
-      "enum": [
-       "male",
-       "female",
-       "undisclosed"
-      ],
-      "title": "Sex",
-      "default": "undisclosed"
-     },
-     "phone": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 30
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Phone"
-     },
-     "community_id": {
-      "type": "integer",
-      "minimum": 1.0,
-      "title": "Community Id"
-     },
-     "consent_to_community_care": {
-      "type": "boolean",
-      "title": "Consent To Community Care"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "name",
-     "birth_year",
-     "community_id",
-     "consent_to_community_care"
-    ],
-    "title": "SelfResidentIn"
-   },
-   "TotpLoginIn": {
-    "properties": {
-     "username": {
-      "type": "string",
-      "maxLength": 80,
-      "minLength": 1,
-      "title": "Username"
-     },
-     "password": {
-      "type": "string",
-      "maxLength": 200,
-      "minLength": 1,
-      "title": "Password"
-     },
-     "totp_code": {
-      "type": "string",
-      "maxLength": 6,
-      "minLength": 6,
-      "title": "Totp Code"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "username",
-     "password",
-     "totp_code"
-    ],
-    "title": "TotpLoginIn"
-   },
-   "UserOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "username": {
-      "type": "string",
-      "title": "Username"
-     },
-     "display_name": {
-      "type": "string",
-      "title": "Display Name"
-     },
-     "role": {
-      "type": "string",
-      "title": "Role"
-     },
-     "community_id": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Community Id"
-     },
-     "invite_code": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Invite Code"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "username",
-     "display_name",
-     "role",
-     "community_id"
-    ],
-    "title": "UserOut"
-   },
-   "ValidationError": {
-    "properties": {
-     "loc": {
-      "items": {
-       "anyOf": [
-        {
-         "type": "string"
+    "/api/auth/logout-all": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout All",
+        "operationId": "logout_all_api_auth_logout_all_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
         },
-        {
-         "type": "integer"
-        }
-       ]
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/mfa/totp": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Setup Totp",
+        "description": "Stage a new factor; the active factor remains usable until confirmation.",
+        "operationId": "setup_totp_api_auth_mfa_totp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpSetupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
-      "type": "array",
-      "title": "Location"
-     },
-     "msg": {
-      "type": "string",
-      "title": "Message"
-     },
-     "type": {
-      "type": "string",
-      "title": "Error Type"
-     },
-     "input": {
-      "title": "Input"
-     },
-     "ctx": {
-      "type": "object",
-      "title": "Context"
-     }
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Disable Totp",
+        "operationId": "disable_totp_api_auth_mfa_totp_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpDisableIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     },
-    "type": "object",
-    "required": [
-     "loc",
-     "msg",
-     "type"
-    ],
-    "title": "ValidationError"
-   },
-   "VisitFinish": {
-    "properties": {
-     "note": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 500
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Note"
-     }
+    "/api/auth/mfa/totp/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Confirm Totp",
+        "operationId": "confirm_totp_api_auth_mfa_totp_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     },
-    "additionalProperties": false,
-    "type": "object",
-    "title": "VisitFinish"
-   },
-   "VisitIn": {
-    "properties": {
-     "resident_id": {
-      "type": "integer",
-      "title": "Resident Id"
-     },
-     "due_date": {
-      "type": "string",
-      "format": "date",
-      "title": "Due Date"
-     },
-     "note": {
-      "anyOf": [
-       {
-        "type": "string",
-        "maxLength": 500
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Note"
-     }
+    "/api/auth/wechat": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Wechat Login",
+        "operationId": "wechat_login_api_auth_wechat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WxLoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "resident_id",
-     "due_date"
-    ],
-    "title": "VisitIn"
-   },
-   "VisitOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "resident_id": {
-      "type": "integer",
-      "title": "Resident Id"
-     },
-     "staff_id": {
-      "type": "integer",
-      "title": "Staff Id"
-     },
-     "due_date": {
-      "type": "string",
-      "format": "date",
-      "title": "Due Date"
-     },
-     "status": {
-      "type": "string",
-      "title": "Status"
-     },
-     "note": {
-      "anyOf": [
-       {
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Note"
-     },
-     "finished_at": {
-      "anyOf": [
-       {
-        "type": "string",
-        "format": "date-time"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Finished At"
-     }
+    "/api/auth/register-family": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register Family",
+        "description": "Open family self-registration: a family account holds no data access until\na resident redeems their secret invite code to grant it.",
+        "operationId": "register_family_api_auth_register_family_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterFamilyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "resident_id",
-     "staff_id",
-     "due_date",
-     "status",
-     "note",
-     "finished_at"
-    ],
-    "title": "VisitOut"
-   },
-   "VitalIn": {
-    "properties": {
-     "type": {
-      "type": "string",
-      "enum": [
-       "blood_pressure",
-       "blood_glucose",
-       "weight"
-      ],
-      "title": "Type"
-     },
-     "systolic": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Systolic"
-     },
-     "diastolic": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Diastolic"
-     },
-     "glucose_mmol_l": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Glucose Mmol L"
-     },
-     "weight_kg": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Weight Kg"
-     },
-     "measured_at": {
-      "anyOf": [
-       {
-        "type": "string",
-        "format": "date-time"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Measured At"
-     }
+    "/api/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me",
+        "operationId": "me_api_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "type"
-    ],
-    "title": "VitalIn"
-   },
-   "VitalOut": {
-    "properties": {
-     "id": {
-      "type": "integer",
-      "title": "Id"
-     },
-     "resident_id": {
-      "type": "integer",
-      "title": "Resident Id"
-     },
-     "type": {
-      "type": "string",
-      "title": "Type"
-     },
-     "systolic": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Systolic"
-     },
-     "diastolic": {
-      "anyOf": [
-       {
-        "type": "integer"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Diastolic"
-     },
-     "glucose_mmol_l": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Glucose Mmol L"
-     },
-     "weight_kg": {
-      "anyOf": [
-       {
-        "type": "number"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Weight Kg"
-     },
-     "measured_at": {
-      "type": "string",
-      "format": "date-time",
-      "title": "Measured At"
-     }
+    "/api/me/family-mode": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Family Mode",
+        "operationId": "family_mode_api_me_family_mode_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "id",
-     "resident_id",
-     "type",
-     "systolic",
-     "diastolic",
-     "glucose_mmol_l",
-     "weight_kg",
-     "measured_at"
-    ],
-    "title": "VitalOut"
-   },
-   "WxLoginIn": {
-    "properties": {
-     "code": {
-      "type": "string",
-      "maxLength": 512,
-      "minLength": 5,
-      "title": "Code"
-     }
+    "/api/communities": {
+      "get": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Communities",
+        "operationId": "communities_api_communities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "code"
-    ],
-    "title": "WxLoginIn"
-   }
+    "/api/residents/me": {
+      "get": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "My Resident",
+        "operationId": "my_resident_api_residents_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResidentOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Create My Resident",
+        "operationId": "create_my_resident_api_residents_me_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelfResidentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResidentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/community/residents": {
+      "get": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "List Community Residents",
+        "operationId": "list_community_residents_api_community_residents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResidentOut"
+                  },
+                  "title": "Response List Community Residents Api Community Residents Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Create Assisted Resident",
+        "operationId": "create_assisted_resident_api_community_residents_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistedResidentIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResidentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/residents/{resident_id}": {
+      "get": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Get Resident",
+        "operationId": "get_resident_api_residents__resident_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResidentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Update Resident",
+        "operationId": "update_resident_api_residents__resident_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResidentPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResidentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/residents/{resident_id}/consents": {
+      "get": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Consents",
+        "operationId": "consents_api_residents__resident_id__consents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConsentOut"
+                  },
+                  "title": "Response Consents Api Residents  Resident Id  Consents Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Update Consent",
+        "operationId": "update_consent_api_residents__resident_id__consents_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/community/stats": {
+      "get": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Community Stats",
+        "operationId": "community_stats_api_community_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/community/accounts": {
+      "post": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Provision Account",
+        "operationId": "provision_account_api_community_accounts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProvisionAccountIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/residents/claim-requests": {
+      "post": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Create Claim Request",
+        "operationId": "create_claim_request_api_residents_claim_requests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/community/claim-requests": {
+      "get": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "List Claim Requests",
+        "operationId": "list_claim_requests_api_community_claim_requests_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(pending|approved|rejected)$",
+              "default": "pending",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClaimRequestOut"
+                  },
+                  "title": "Response List Claim Requests Api Community Claim Requests Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/community/claim-requests/{claim_id}/review": {
+      "post": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Review Claim Request",
+        "operationId": "review_claim_request_api_community_claim_requests__claim_id__review_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "claim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Claim Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimReviewIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimRequestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/community/consent-reviews": {
+      "get": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Pending Consent Reviews",
+        "operationId": "pending_consent_reviews_api_community_consent_reviews_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConsentOut"
+                  },
+                  "type": "array",
+                  "title": "Response Pending Consent Reviews Api Community Consent Reviews Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/community/consent-events/{event_id}/review": {
+      "post": {
+        "tags": [
+          "residents"
+        ],
+        "summary": "Review Consent Event",
+        "operationId": "review_consent_event_api_community_consent_events__event_id__review_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentReviewIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/residents/{resident_id}/vitals": {
+      "get": {
+        "tags": [
+          "vitals"
+        ],
+        "summary": "List Vitals",
+        "operationId": "list_vitals_api_residents__resident_id__vitals_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          },
+          {
+            "name": "metric",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(blood_pressure|blood_glucose|weight)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Metric"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VitalOut"
+                  },
+                  "title": "Response List Vitals Api Residents  Resident Id  Vitals Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "vitals"
+        ],
+        "summary": "Create Vital",
+        "operationId": "create_vital_api_residents__resident_id__vitals_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VitalIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VitalOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/residents/{resident_id}/vitals/{vital_id}": {
+      "delete": {
+        "tags": [
+          "vitals"
+        ],
+        "summary": "Delete Vital",
+        "operationId": "delete_vital_api_residents__resident_id__vitals__vital_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          },
+          {
+            "name": "vital_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Vital Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/questionnaires": {
+      "get": {
+        "tags": [
+          "questionnaires"
+        ],
+        "summary": "List Questionnaires",
+        "operationId": "list_questionnaires_api_questionnaires_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuestionnaireOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Questionnaires Api Questionnaires Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/questionnaires/{questionnaire_id}": {
+      "get": {
+        "tags": [
+          "questionnaires"
+        ],
+        "summary": "Get Questionnaire",
+        "operationId": "get_questionnaire_api_questionnaires__questionnaire_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "questionnaire_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Questionnaire Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionnaireOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/residents/{resident_id}/responses": {
+      "post": {
+        "tags": [
+          "questionnaires"
+        ],
+        "summary": "Submit Responses",
+        "operationId": "submit_responses_api_residents__resident_id__responses_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswersIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "questionnaires"
+        ],
+        "summary": "My Responses",
+        "operationId": "my_responses_api_residents__resident_id__responses_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResponseOut"
+                  },
+                  "title": "Response My Responses Api Residents  Resident Id  Responses Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/residents/{resident_id}/reminders": {
+      "get": {
+        "tags": [
+          "reminders"
+        ],
+        "summary": "List Reminders",
+        "operationId": "list_reminders_api_residents__resident_id__reminders_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "pending_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Pending Only"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReminderOut"
+                  },
+                  "title": "Response List Reminders Api Residents  Resident Id  Reminders Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "reminders"
+        ],
+        "summary": "Create Reminder",
+        "operationId": "create_reminder_api_residents__resident_id__reminders_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/residents/{resident_id}/reminders/{reminder_id}/complete": {
+      "patch": {
+        "tags": [
+          "reminders"
+        ],
+        "summary": "Complete Reminder",
+        "operationId": "complete_reminder_api_residents__resident_id__reminders__reminder_id__complete_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          },
+          {
+            "name": "reminder_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Reminder Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/invite-code/rotate": {
+      "post": {
+        "tags": [
+          "family"
+        ],
+        "summary": "Rotate Invite Code",
+        "description": "Replace the user's family invite code; the old code stops working immediately.",
+        "operationId": "rotate_invite_code_api_me_invite_code_rotate_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/residents/{resident_id}/family-grants": {
+      "post": {
+        "tags": [
+          "family"
+        ],
+        "summary": "Grant Family",
+        "operationId": "grant_family_api_residents__resident_id__family_grants_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyGrantIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyGrantOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "family"
+        ],
+        "summary": "List Family Grants",
+        "operationId": "list_family_grants_api_residents__resident_id__family_grants_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FamilyGrantOut"
+                  },
+                  "title": "Response List Family Grants Api Residents  Resident Id  Family Grants Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/residents/{resident_id}/family-grants/{grant_id}": {
+      "delete": {
+        "tags": [
+          "family"
+        ],
+        "summary": "Revoke Family",
+        "operationId": "revoke_family_api_residents__resident_id__family_grants__grant_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          },
+          {
+            "name": "grant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Grant Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/residents/{resident_id}/family-grants/{grant_id}/decline": {
+      "post": {
+        "tags": [
+          "family"
+        ],
+        "summary": "Decline Family Grant",
+        "description": "Grantee-side refusal: the invited family member can reject a grant made to them.",
+        "operationId": "decline_family_grant_api_residents__resident_id__family_grants__grant_id__decline_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          },
+          {
+            "name": "grant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Grant Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/family/shared-residents": {
+      "get": {
+        "tags": [
+          "family"
+        ],
+        "summary": "Shared Residents",
+        "operationId": "shared_residents_api_family_shared_residents_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/community/visits": {
+      "get": {
+        "tags": [
+          "visits"
+        ],
+        "summary": "Staff Visits",
+        "operationId": "staff_visits_api_community_visits_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VisitOut"
+                  },
+                  "type": "array",
+                  "title": "Response Staff Visits Api Community Visits Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "visits"
+        ],
+        "summary": "Create Visit",
+        "operationId": "create_visit_api_community_visits_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/community/visits/{visit_id}/finish": {
+      "patch": {
+        "tags": [
+          "visits"
+        ],
+        "summary": "Finish Visit",
+        "operationId": "finish_visit_api_community_visits__visit_id__finish_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Visit Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitFinish"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/residents/{resident_id}/visits": {
+      "get": {
+        "tags": [
+          "visits"
+        ],
+        "summary": "Self Visits",
+        "operationId": "self_visits_api_residents__resident_id__visits_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/summary": {
+      "get": {
+        "tags": [
+          "visits"
+        ],
+        "summary": "Admin Summary",
+        "operationId": "admin_summary_api_admin_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Users",
+        "operationId": "list_users_api_admin_users_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminUserOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Users Api Admin Users Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Staff",
+        "operationId": "create_staff_api_admin_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStaffIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/users/{user_id}/deactivate": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Deactivate User",
+        "operationId": "deactivate_user_api_admin_users__user_id__deactivate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{user_id}/activate": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Activate User",
+        "operationId": "activate_user_api_admin_users__user_id__activate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/community/health-stats": {
+      "get": {
+        "tags": [
+          "reporting"
+        ],
+        "summary": "Health Stats",
+        "operationId": "health_stats_api_community_health_stats_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80,
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/status": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Status",
+        "operationId": "status_api_assistant_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/assistant/chat": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Chat",
+        "operationId": "chat_api_assistant_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/residents/{resident_id}/reports": {
+      "post": {
+        "tags": [
+          "private reports"
+        ],
+        "summary": "Upload Report",
+        "operationId": "upload_report_api_residents__resident_id__reports_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "private reports"
+        ],
+        "summary": "List Reports",
+        "operationId": "list_reports_api_residents__resident_id__reports_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resident Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/{report_id}": {
+      "get": {
+        "tags": [
+          "private reports"
+        ],
+        "summary": "Get Report",
+        "operationId": "get_report_api_reports__report_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/{report_id}/original": {
+      "get": {
+        "tags": [
+          "private reports"
+        ],
+        "summary": "Original Report",
+        "operationId": "original_report_api_reports__report_id__original_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/{report_id}/pages/{page}": {
+      "get": {
+        "tags": [
+          "private reports"
+        ],
+        "summary": "Report Page",
+        "operationId": "report_page_api_reports__report_id__pages__page__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/{report_id}/extract": {
+      "post": {
+        "tags": [
+          "private reports"
+        ],
+        "summary": "Request Extraction",
+        "operationId": "request_extraction_api_reports__report_id__extract_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/{report_id}/confirm": {
+      "post": {
+        "tags": [
+          "private reports"
+        ],
+        "summary": "Confirm Report",
+        "operationId": "confirm_report_api_reports__report_id__confirm_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportReview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/report-chat": {
+      "post": {
+        "tags": [
+          "private report assistant"
+        ],
+        "summary": "Report Chat",
+        "operationId": "report_chat_api_assistant_report_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportChatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "operations"
+        ],
+        "summary": "Health",
+        "operationId": "health_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
   },
-  "securitySchemes": {
-   "HTTPBearer": {
-    "type": "http",
-    "scheme": "bearer"
-   }
+  "components": {
+    "schemas": {
+      "AdminUserOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "community_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Community Id"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "mfa_enabled": {
+            "type": "boolean",
+            "title": "Mfa Enabled"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "password_updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "role",
+          "community_id",
+          "is_active",
+          "mfa_enabled",
+          "last_login_at",
+          "password_updated_at"
+        ],
+        "title": "AdminUserOut"
+      },
+      "AnswersIn": {
+        "properties": {
+          "questionnaire_id": {
+            "type": "integer",
+            "title": "Questionnaire Id"
+          },
+          "answers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "maxProperties": 40,
+            "minProperties": 1,
+            "title": "Answers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "questionnaire_id",
+          "answers"
+        ],
+        "title": "AnswersIn"
+      },
+      "AssistedResidentIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Name"
+          },
+          "birth_year": {
+            "type": "integer",
+            "maximum": 2100.0,
+            "minimum": 1900.0,
+            "title": "Birth Year"
+          },
+          "sex": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "undisclosed"
+            ],
+            "title": "Sex",
+            "default": "undisclosed"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "community_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Community Id"
+          },
+          "consent_confirmed": {
+            "type": "boolean",
+            "title": "Consent Confirmed"
+          },
+          "evidence_ref": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 5,
+            "title": "Evidence Ref"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "birth_year",
+          "community_id",
+          "consent_confirmed",
+          "evidence_ref"
+        ],
+        "title": "AssistedResidentIn"
+      },
+      "ChatIn": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryItem"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "History"
+          },
+          "allow_health_data": {
+            "type": "boolean",
+            "title": "Allow Health Data",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatIn"
+      },
+      "ClaimRequestIn": {
+        "properties": {
+          "resident_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Resident Id"
+          },
+          "full_name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Full Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "resident_id",
+          "full_name"
+        ],
+        "title": "ClaimRequestIn"
+      },
+      "ClaimRequestOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "resident_id": {
+            "type": "integer",
+            "title": "Resident Id"
+          },
+          "requester_id": {
+            "type": "integer",
+            "title": "Requester Id"
+          },
+          "requester_name": {
+            "type": "string",
+            "title": "Requester Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "stated_name": {
+            "type": "string",
+            "title": "Stated Name"
+          },
+          "stated_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stated Phone"
+          },
+          "name_matched": {
+            "type": "boolean",
+            "title": "Name Matched"
+          },
+          "phone_matched": {
+            "type": "boolean",
+            "title": "Phone Matched"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "resident_id",
+          "requester_id",
+          "requester_name",
+          "status",
+          "stated_name",
+          "stated_phone",
+          "name_matched",
+          "phone_matched",
+          "note",
+          "reviewed_at",
+          "created_at"
+        ],
+        "title": "ClaimRequestOut"
+      },
+      "ClaimReviewIn": {
+        "properties": {
+          "approve": {
+            "type": "boolean",
+            "title": "Approve"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "approve"
+        ],
+        "title": "ClaimReviewIn"
+      },
+      "ConsentIn": {
+        "properties": {
+          "granted": {
+            "type": "boolean",
+            "title": "Granted"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "granted"
+        ],
+        "title": "ConsentIn"
+      },
+      "ConsentOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "actor_id": {
+            "type": "integer",
+            "title": "Actor Id"
+          },
+          "resident_id": {
+            "type": "integer",
+            "title": "Resident Id"
+          },
+          "granted": {
+            "type": "boolean",
+            "title": "Granted"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "review_status": {
+            "type": "string",
+            "title": "Review Status",
+            "default": "approved"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "actor_id",
+          "resident_id",
+          "granted",
+          "purpose",
+          "method",
+          "evidence_ref",
+          "created_at"
+        ],
+        "title": "ConsentOut"
+      },
+      "ConsentReviewIn": {
+        "properties": {
+          "approve": {
+            "type": "boolean",
+            "title": "Approve"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "approve"
+        ],
+        "title": "ConsentReviewIn"
+      },
+      "CreateStaffIn": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 2,
+            "title": "Display Name"
+          },
+          "community_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Community Id"
+          },
+          "initial_password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Initial Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "display_name",
+          "community_id",
+          "initial_password"
+        ],
+        "title": "CreateStaffIn"
+      },
+      "FamilyGrantIn": {
+        "properties": {
+          "invite_code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 10,
+            "title": "Invite Code"
+          },
+          "can_profile": {
+            "type": "boolean",
+            "title": "Can Profile",
+            "default": true
+          },
+          "can_vitals": {
+            "type": "boolean",
+            "title": "Can Vitals",
+            "default": true
+          },
+          "expires_in_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Expires In Days",
+            "default": 30
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "invite_code"
+        ],
+        "title": "FamilyGrantIn"
+      },
+      "FamilyGrantOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "resident_id": {
+            "type": "integer",
+            "title": "Resident Id"
+          },
+          "grantee_id": {
+            "type": "integer",
+            "title": "Grantee Id"
+          },
+          "grantee_name": {
+            "type": "string",
+            "title": "Grantee Name"
+          },
+          "can_profile": {
+            "type": "boolean",
+            "title": "Can Profile"
+          },
+          "can_vitals": {
+            "type": "boolean",
+            "title": "Can Vitals"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "resident_id",
+          "grantee_id",
+          "grantee_name",
+          "can_profile",
+          "can_vitals",
+          "expires_at",
+          "revoked_at"
+        ],
+        "title": "FamilyGrantOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HistoryItem": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 3000,
+            "minLength": 1,
+            "title": "Content"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "HistoryItem"
+      },
+      "LoginIn": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginIn"
+      },
+      "PasswordChangeIn": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Current Password"
+          },
+          "new_password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "New Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "PasswordChangeIn"
+      },
+      "ProvisionAccountIn": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 2,
+            "title": "Display Name"
+          },
+          "initial_password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Initial Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "display_name",
+          "initial_password"
+        ],
+        "title": "ProvisionAccountIn"
+      },
+      "QuestionnaireOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "questions": {
+            "items": {},
+            "type": "array",
+            "title": "Questions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "title",
+          "version",
+          "category",
+          "questions"
+        ],
+        "title": "QuestionnaireOut"
+      },
+      "RegisterFamilyIn": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 4,
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 2,
+            "title": "Display Name"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "display_name",
+          "password"
+        ],
+        "title": "RegisterFamilyIn"
+      },
+      "ReminderIn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "measure",
+              "questionnaire",
+              "followup"
+            ],
+            "title": "Type"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Title"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "due_date"
+        ],
+        "title": "ReminderIn"
+      },
+      "ReminderOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "resident_id": {
+            "type": "integer",
+            "title": "Resident Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "resident_id",
+          "type",
+          "title",
+          "due_date",
+          "completed_at"
+        ],
+        "title": "ReminderOut"
+      },
+      "ReportChatIn": {
+        "properties": {
+          "report_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Report Id"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryItem"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "History"
+          },
+          "allow_report_data": {
+            "type": "boolean",
+            "title": "Allow Report Data",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "report_id",
+          "message"
+        ],
+        "title": "ReportChatIn"
+      },
+      "ReportImport": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Item Id"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "blood_pressure",
+              "blood_glucose",
+              "weight"
+            ],
+            "title": "Type"
+          },
+          "measured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Measured At"
+          },
+          "systolic": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Systolic"
+          },
+          "diastolic": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diastolic"
+          },
+          "glucose_mmol_l": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Glucose Mmol L"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item_id",
+          "type",
+          "measured_at"
+        ],
+        "title": "ReportImport"
+      },
+      "ReportItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 50,
+            "title": "Unit",
+            "default": ""
+          },
+          "reference_range": {
+            "type": "string",
+            "maxLength": 150,
+            "title": "Reference Range",
+            "default": ""
+          },
+          "flag": {
+            "type": "string",
+            "maxLength": 30,
+            "title": "Flag",
+            "default": ""
+          },
+          "page": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "quote": {
+            "type": "string",
+            "maxLength": 600,
+            "minLength": 1,
+            "title": "Quote"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "value",
+          "page",
+          "quote"
+        ],
+        "title": "ReportItem"
+      },
+      "ReportReview": {
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision"
+          },
+          "identity_confirmed": {
+            "type": "boolean",
+            "title": "Identity Confirmed"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "patient_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Name"
+          },
+          "specimen_collected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specimen Collected At"
+          },
+          "reported_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported At"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReportItem"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Items"
+          },
+          "imports": {
+            "items": {
+              "$ref": "#/components/schemas/ReportImport"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Imports"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "revision",
+          "identity_confirmed",
+          "title",
+          "items"
+        ],
+        "title": "ReportReview"
+      },
+      "ResidentOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "birth_year": {
+            "type": "integer",
+            "title": "Birth Year"
+          },
+          "sex": {
+            "type": "string",
+            "title": "Sex"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "community_id": {
+            "type": "integer",
+            "title": "Community Id"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "consent_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Active"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "birth_year",
+          "sex",
+          "phone",
+          "community_id",
+          "owner_user_id"
+        ],
+        "title": "ResidentOut"
+      },
+      "ResidentPatch": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "birth_year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2100.0,
+                "minimum": 1900.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birth Year"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "male",
+                  "female",
+                  "undisclosed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sex"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ResidentPatch"
+      },
+      "ResponseOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "resident_id": {
+            "type": "integer",
+            "title": "Resident Id"
+          },
+          "questionnaire_id": {
+            "type": "integer",
+            "title": "Questionnaire Id"
+          },
+          "questionnaire_version": {
+            "type": "integer",
+            "title": "Questionnaire Version"
+          },
+          "answers": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Answers"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "resident_id",
+          "questionnaire_id",
+          "questionnaire_version",
+          "answers",
+          "created_at"
+        ],
+        "title": "ResponseOut"
+      },
+      "SelfResidentIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Name"
+          },
+          "birth_year": {
+            "type": "integer",
+            "maximum": 2100.0,
+            "minimum": 1900.0,
+            "title": "Birth Year"
+          },
+          "sex": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female",
+              "undisclosed"
+            ],
+            "title": "Sex",
+            "default": "undisclosed"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "community_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Community Id"
+          },
+          "consent_to_community_care": {
+            "type": "boolean",
+            "title": "Consent To Community Care"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "birth_year",
+          "community_id",
+          "consent_to_community_care"
+        ],
+        "title": "SelfResidentIn"
+      },
+      "TotpConfirmIn": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Current Password"
+          },
+          "totp_code": {
+            "type": "string",
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Totp Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "current_password",
+          "totp_code"
+        ],
+        "title": "TotpConfirmIn"
+      },
+      "TotpDisableIn": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Current Password"
+          },
+          "totp_code": {
+            "type": "string",
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Totp Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "current_password",
+          "totp_code"
+        ],
+        "title": "TotpDisableIn"
+      },
+      "TotpLoginIn": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password"
+          },
+          "totp_code": {
+            "type": "string",
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Totp Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "password",
+          "totp_code"
+        ],
+        "title": "TotpLoginIn"
+      },
+      "TotpSetupIn": {
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Current Password"
+          },
+          "totp_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 6,
+                "minLength": 6
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totp Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "current_password"
+        ],
+        "title": "TotpSetupIn"
+      },
+      "UserOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "community_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Community Id"
+          },
+          "invite_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "role",
+          "community_id"
+        ],
+        "title": "UserOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VisitFinish": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "VisitFinish"
+      },
+      "VisitIn": {
+        "properties": {
+          "resident_id": {
+            "type": "integer",
+            "title": "Resident Id"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "resident_id",
+          "due_date"
+        ],
+        "title": "VisitIn"
+      },
+      "VisitOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "resident_id": {
+            "type": "integer",
+            "title": "Resident Id"
+          },
+          "staff_id": {
+            "type": "integer",
+            "title": "Staff Id"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "resident_id",
+          "staff_id",
+          "due_date",
+          "status",
+          "note",
+          "finished_at"
+        ],
+        "title": "VisitOut"
+      },
+      "VitalIn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "blood_pressure",
+              "blood_glucose",
+              "weight"
+            ],
+            "title": "Type"
+          },
+          "systolic": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Systolic"
+          },
+          "diastolic": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diastolic"
+          },
+          "glucose_mmol_l": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Glucose Mmol L"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          },
+          "measured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "VitalIn"
+      },
+      "VitalOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "resident_id": {
+            "type": "integer",
+            "title": "Resident Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "systolic": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Systolic"
+          },
+          "diastolic": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diastolic"
+          },
+          "glucose_mmol_l": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Glucose Mmol L"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          },
+          "measured_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Measured At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "resident_id",
+          "type",
+          "systolic",
+          "diastolic",
+          "glucose_mmol_l",
+          "weight_kg",
+          "measured_at"
+        ],
+        "title": "VitalOut"
+      },
+      "WxLoginIn": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 5,
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "WxLoginIn"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
   }
- }
 }

@@ -1,4 +1,5 @@
 import os
+import base64
 from dataclasses import dataclass, field
 
 
@@ -32,6 +33,12 @@ class Settings:
     login_rate_per_minute: int = _int_env("LOGIN_RATE_PER_MINUTE", 10)
     # WeChat code2session attempts allowed per IP per minute.
     wechat_login_rate_per_minute: int = _int_env("WECHAT_LOGIN_RATE_PER_MINUTE", 10)
+    # Server-side only; inherited credentials are never returned to the browser.
+    deepseek_api_key: str = field(default=os.getenv("DEEPSEEK_API_KEY", ""), repr=False)
+    deepseek_base_url: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+    deepseek_model: str = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
+    report_storage_dir: str = os.getenv("REPORT_STORAGE_DIR", "./private_reports")
+    report_worker_enabled: bool = os.getenv("REPORT_WORKER_ENABLED", "true").lower() == "true"
 
 
 settings = Settings()
@@ -45,9 +52,15 @@ def validate_settings() -> None:
             raise RuntimeError("Production SECRET_KEY must be random and >=48 characters")
         if settings.demo_auth:
             raise RuntimeError("ENABLE_DEMO_AUTH may not run in production")
-        if settings.database_url.startswith("sqlite:"):
+        if not settings.database_url.startswith(("postgresql://", "postgresql+")):
             raise RuntimeError("Production requires PostgreSQL; SQLite is development-only")
         if not settings.allowed_hosts:
             raise RuntimeError("Production requires ALLOWED_HOSTS to restrict the Host header")
         if not settings.field_encryption_key:
             raise RuntimeError("Production requires FIELD_ENCRYPTION_KEY (base64 of 32 random bytes) for sensitive columns")
+        try:
+            key = base64.b64decode(settings.field_encryption_key.strip(), validate=True)
+        except (ValueError, TypeError):
+            raise RuntimeError("Production FIELD_ENCRYPTION_KEY must be valid base64 for 32 bytes") from None
+        if len(key) != 32:
+            raise RuntimeError("Production FIELD_ENCRYPTION_KEY must decode to 32 bytes")

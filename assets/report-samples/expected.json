@@ -1,0 +1,113 @@
+{
+  "fixture_id": "ANLIN-FICTION-20261020-01",
+  "fictional": true,
+  "required_marker_each_page": "虚构测试样本 非真实医疗报告",
+  "center": "安邻演示检验中心（虚构）",
+  "patient": "虚构王一",
+  "sample_datetime": "2026-10-20 08:30 +08:00",
+  "report_datetime": "2026-10-20 10:00 +08:00",
+  "pdf_pages": 2,
+  "scan_source_page": 1,
+  "items": [
+    {
+      "page": 1,
+      "code": "BP",
+      "name": "血压",
+      "value": "132/84",
+      "unit": "mmHg",
+      "reference_range": "--",
+      "flag": "--"
+    },
+    {
+      "page": 1,
+      "code": "GLU",
+      "name": "血糖",
+      "value": "5.8",
+      "unit": "mmol/L",
+      "reference_range": "3.9-6.1",
+      "flag": "N"
+    },
+    {
+      "page": 1,
+      "code": "WT",
+      "name": "体重",
+      "value": "62.5",
+      "unit": "kg",
+      "reference_range": "--",
+      "flag": "--"
+    },
+    {
+      "page": 1,
+      "code": "HGB",
+      "name": "血红蛋白",
+      "value": "131",
+      "unit": "g/L",
+      "reference_range": "115-150",
+      "flag": "N"
+    },
+    {
+      "page": 1,
+      "code": "WBC",
+      "name": "白细胞计数",
+      "value": "6.2",
+      "unit": "x10^9/L",
+      "reference_range": "3.5-9.5",
+      "flag": "N"
+    },
+    {
+      "page": 1,
+      "code": "TC",
+      "name": "总胆固醇",
+      "value": "5.42",
+      "unit": "mmol/L",
+      "reference_range": "<5.20",
+      "flag": "H"
+    },
+    {
+      "page": 2,
+      "code": "CREA",
+      "name": "肌酐",
+      "value": "77",
+      "unit": "μmol/L",
+      "reference_range": "44-97",
+      "flag": "N"
+    },
+    {
+      "page": 2,
+      "code": "ALT",
+      "name": "丙氨酸氨基转移酶",
+      "value": "22",
+      "unit": "U/L",
+      "reference_range": "7-40",
+      "flag": "N"
+    },
+    {
+      "page": 2,
+      "code": "AST",
+      "name": "天门冬氨酸氨基转移酶",
+      "value": "19",
+      "unit": "U/L",
+      "reference_range": "13-35",
+      "flag": "N"
+    },
+    {
+      "page": 2,
+      "code": "UA",
+      "name": "尿酸",
+      "value": "318",
+      "unit": "μmol/L",
+      "reference_range": "155-357",
+      "flag": "N"
+    },
+    {
+      "page": 2,
+      "code": "UPRO",
+      "name": "尿蛋白（定性）",
+      "value": "阴性",
+      "unit": "--",
+      "reference_range": "阴性",
+      "flag": "N"
+    }
+  ],
+  "note": "Flags are literal fixture text, not a clinical interpretation."
+}

@@ -102,21 +102,29 @@ def test_logout_all_invalidates_existing_token(client, token):
 
 def test_totp_flow(client, token):
     h = token('staff')
-    setup = client.post('/api/auth/mfa/totp', headers=h)
+    setup = client.post('/api/auth/mfa/totp', headers=h, json={'current_password': 'DemoPass2026!'})
     assert setup.status_code == 200
     secret = setup.json()['secret']
     assert setup.json()['uri'].startswith('otpauth://totp/')
+    # Provisioning does not activate the factor until the staged code is proven.
+    assert login(client, 'staff').status_code == 200
+    code = totp_mod._code_at(secret, int(time.time() // 30))
+    confirmed = client.post('/api/auth/mfa/totp/confirm', headers=h,
+                            json={'current_password': 'DemoPass2026!', 'totp_code': code})
+    assert confirmed.status_code == 200
+    assert client.get('/api/me', headers=h).status_code == 401
+    h = {'Authorization': 'Bearer ' + confirmed.json()['access_token']}
     # Password alone no longer logs in; the response flags MFA.
     r = login(client, 'staff')
     assert r.status_code == 401 and r.headers.get('X-MFA-Required') == 'totp'
     wrong = client.post('/api/auth/login/totp', json={'username': 'staff', 'password': 'DemoPass2026!', 'totp_code': '000000'})
     assert wrong.status_code == 401
-    code = totp_mod._code_at(secret, int(time.time() // 30))
     good = client.post('/api/auth/login/totp', json={'username': 'staff', 'password': 'DemoPass2026!', 'totp_code': code})
     assert good.status_code == 200
     assert client.get('/api/me', headers={'Authorization': 'Bearer ' + good.json()['access_token']}).json()['username'] == 'staff'
     # Disabling MFA rotates the token version and clears the factor.
-    assert client.delete('/api/auth/mfa/totp', headers=h).status_code == 200
+    assert client.request('DELETE', '/api/auth/mfa/totp', headers=h,
+                          json={'current_password': 'DemoPass2026!', 'totp_code': code}).status_code == 200
     assert login(client, 'staff').status_code == 200
 
 
@@ -223,13 +231,17 @@ def test_paper_consent_requires_review_and_rejection_cuts_access(client, token):
         'name': '虚构待复核', 'birth_year': 1948, 'community_id': 1,
         'consent_confirmed': True, 'evidence_ref': 'PAPER-REVIEW-0001'})
     rid = r.json()['id']
-    # Pending paper consent still allows pilot access, and appears in the review queue.
+    # Pending paper consent never grants access and appears in the review queue.
+    assert r.json()['consent_active'] is False
+    assert client.get(f'/api/residents/{rid}', headers=staff).status_code == 404
     queue = client.get('/api/community/consent-reviews', headers=staff).json()
     assert any(e['evidence_ref'] == 'PAPER-REVIEW-0001' and e['review_status'] == 'pending' for e in queue)
     event_id = queue[0]['id']
     assert client.post(f'/api/community/consent-events/{event_id}/review', headers=token('staff2'),
                        json={'approve': True}).status_code == 404
-    rejected = client.post(f'/api/community/consent-events/{event_id}/review', headers=staff,
+    assert client.post(f'/api/community/consent-events/{event_id}/review', headers=staff,
+                       json={'approve': True}).status_code == 403
+    rejected = client.post(f'/api/community/consent-events/{event_id}/review', headers=token('staff_peer'),
                            json={'approve': False, 'note': '证据编号无法核对'})
     assert rejected.status_code == 200 and rejected.json()['review_status'] == 'rejected'
     # Rejection immediately revokes staff visibility, not the resident's own access.

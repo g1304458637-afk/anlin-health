@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update
 from ..db import get_db
 from ..models import User, Resident, Vital
 from ..deps import auth_user, check_access, audit, is_owner
@@ -11,12 +11,12 @@ router = APIRouter(prefix="/api", tags=["vitals"])
 
 
 @router.get("/residents/{resident_id}/vitals", response_model=list[VitalOut])
-def list_vitals(resident_id: int, metric: str | None = Query(default=None, pattern="^(blood_pressure|blood_glucose|weight)$"), limit: int = Query(default=50, ge=1, le=100), user: User = Depends(auth_user), db: Session = Depends(get_db)):
+def list_vitals(resident_id: int, metric: str | None = Query(default=None, pattern="^(blood_pressure|blood_glucose|weight)$"), limit: int = Query(default=50, ge=1, le=100), offset: int = Query(default=0, ge=0), user: User = Depends(auth_user), db: Session = Depends(get_db)):
     check_access(db, user, db.get(Resident, resident_id), scope="vitals")
     query = select(Vital).where(Vital.resident_id == resident_id)
     if metric:
         query = query.where(Vital.type == metric)
-    return db.scalars(query.order_by(Vital.measured_at.desc(), Vital.id.desc()).limit(limit)).all()
+    return db.scalars(query.order_by(Vital.measured_at.desc(), Vital.id.desc()).offset(offset).limit(limit)).all()
 
 
 @router.post("/residents/{resident_id}/vitals", response_model=VitalOut, status_code=201)
@@ -46,5 +46,9 @@ def delete_vital(resident_id: int, vital_id: int, user: User = Depends(auth_user
     if not is_owner(user, resident):
         raise HTTPException(403, "仅档案本人可删除记录")
     audit(db, user, "delete_vital", "vital", record.id)
+    from ..report_models import ReportVitalLink
+    # Keep the report/item import tombstone while allowing the owner to remove
+    # the timeline entry, including in SQLite where FK actions may be disabled.
+    db.execute(update(ReportVitalLink).where(ReportVitalLink.vital_id == record.id).values(vital_id=None))
     db.delete(record)
     db.commit()

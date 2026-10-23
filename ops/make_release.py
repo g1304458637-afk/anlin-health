@@ -7,13 +7,16 @@ import zipfile
 import hashlib
 
 ROOT = Path(__file__).resolve().parents[1]
-IGNORED = {'.git', '.pytest_cache', '__pycache__', 'node_modules', 'miniprogram_npm', '.venv', '.vscode', '.idea'}
-IGNORED_SUFFIXES = {'.pyc', '.db', '.sqlite3', '.log'}
+IGNORED = {'.git', '.pytest_cache', '__pycache__', 'node_modules', 'miniprogram_npm', '.venv', '.vscode', '.idea', '.runtime', 'private_reports'}
+IGNORED_SUFFIXES = {'.pyc', '.db', '.sqlite', '.sqlite3', '.log'}
 
 
 def allowed(path: Path):
     rel = path.relative_to(ROOT)
-    return not (any(part in IGNORED for part in rel.parts) or path.name == '.env' or path.suffix.lower() in IGNORED_SUFFIXES or path.name.startswith('.DS_Store'))
+    secret_env = path.name.startswith('.env') and path.name not in {'.env.example', '.env.template'}
+    database_sidecar = path.name.endswith(('-wal', '-shm', '-journal'))
+    return not (any(part in IGNORED for part in rel.parts) or secret_env or database_sidecar
+                or path.suffix.lower() in IGNORED_SUFFIXES or path.name.startswith('.DS_Store'))
 
 
 def main():

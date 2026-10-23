@@ -1,48 +1,29 @@
-# 当前完成情况：真实状态表
+# 当前完成情况：v0.6 本地开发候选
 
-**截至 2026-10-23 · v0.3 全网页端批次后；本包是开发试点，不是生产系统。**
+**截至 2026-10-23。** 状态分为“本地验证”“代码已写、待环境/人工验收”“未实现”。本地开发工作树是 `codex/anlin-web-agent-20261023`；原始 `main@1ea6061` 未改动。最终集成测试数与浏览器证据见 `QA_REPORT.md`，不以历史版本的测试数替代。
 
-状态只用三种：**实测完成**（有自动化测试或真实运行证据）/ **代码已写未验收**（缺真实环境或人工验收）/ **未实现**。
+| 模块 | 状态 | 当前事实与限制 |
+|---|---|---|
+| 后端 API、角色和对象权限 | 本地验证 | SQLite 测试覆盖本人、家属授权范围、同社区员工、管理员聚合与越权拒绝；仍需渗透测试。 |
+| 居民/家属门户 `/app` | 本地浏览器验证 | 登录、自建档、认领申请、测量、问卷、提醒、家属邀请码授权/拒绝/撤回、社区同意撤回/重授、改密与登出；换账号清空旧页面和会话状态。 |
+| 社区工作台 `/console` | 本地浏览器验证 | 员工开通居民账号、协助建档、认领与纸质同意复核、测量、随访、分页统计、MFA 设置；复核人须为另一位同社区员工。 |
+| 管理员员工账号管理 | 本地代码/测试验证 | 管理员在“安全与设置”可为指定社区开通第二位员工，并查看、停用或启用账号，以支持独立复核；网页不开放管理员创建、角色编辑或密码重置。 |
+| 线下档案认领 | 本地验证 | 档案号/姓名/电话仅提交申请，统一响应防枚举；线下核验批准前不能取得档案，认领不自动产生社区护理同意。 |
+| 社区护理同意 | 本地验证 | 本人可撤回/重授；纸质同意待复核时不可访问，驳回立即阻断员工访问；证据真实性仍需机构核实。 |
+| 家属授权 | 本地验证 | 家属注册零权限；使用家属自己的邀请码，由本人选择字段与期限；过期、撤回、家属拒绝立即生效。 |
+| 健康统计 `/api/community/health-stats` | 本地验证 | 仅本社区、最新同意有效且已批准的居民；聚合总数与列表分页分开计算，支持 `limit`、`offset`、`q`。小样本聚合仍有推断风险。 |
+| 助手 `/api/assistant/status`、`/chat` | 本地 API 测试；模型目录实时核验 | `deepseek-flash` 在继承的凭据下出现在实时模型目录；问答/导航和明确同意后的当前身份只读数量/日期工具已实现。未将模型目录结果当作生产聊天验收；用户聊天文本会发往 DeepSeek，供应商合规未验收。 |
+| 密码、会话、MFA | 本地验证 | 密码强度/锁定/限流、旧 JWT 失效；TOTP 先暂存再验证码确认，重设/关闭验证现有因子。认证器丢失与机构开户仍需制度。 |
+| 静态加密 | 本地 SQLite 验证 | 居民/认领电话及待确认/已启用 TOTP 密钥在配置 `FIELD_ENCRYPTION_KEY` 时用 AES-GCM；正式密钥管理、轮换、旧明文迁移未完成。 |
+| 私人报告上传/查看 | 代码已写，最终本地证据见 QA | 本人和有效同意下的同社区员工可上传 10 MiB/5 页以内 PDF、PNG、JPEG、WebP；原件私有保存并校验 SHA-256，家属/管理员不可读原件或草稿。开发环境未配字段密钥时允许明文，生产必须加密。 |
+| 云端报告提取 | 代码已写，最终本地证据见 QA | 每份报告单独同意后才向 DeepSeek 逐页发送文字或图像；worker 使用数据库租约和每页授权复核。中断超过 7 分钟标记失败，由用户主动重试，最多 3 次；没有 PaddleOCR。模型转录和 quote 不构成可靠 OCR 坐标/置信度。 |
+| 人工核对/可选健康指标导入 | 代码已写，最终本地证据见 QA | 原件、候选、已确认内容分开；确认身份及逐项人工核对后可只保存报告。仅明确选择且名称、数值、单位、带时区测量时间一致的血压、血糖、体重可导入；其他检验项留在报告。 |
+| 已确认报告问答 `/api/assistant/report-chat` | 代码已写，最终本地证据见 QA | 从单份已确认报告进入，同页单独许可后发送问题/历史/确认字段；仅本人或有效同意下的同社区员工。模型选择受限证据 ID/意图，服务端构造回答和来源；图片页来源为转录而非像素证明。无法定位则证据不足，医疗咨询不给诊断/用药建议；切换报告/版本/账号清空许可与历史。只读，不保存问答文本；每账号 6 次/分钟、最多 100 项/40000 字符上下文及 8 个来源。 |
+| 虚构报告样本 | 本地生成并逐页可视检查 | `assets/report-samples/` 含双页原生文字 PDF、首页扫描 PNG 和 11 项 golden；用于功能回归，不能用来宣称真实 OCR 准确率。 |
+| 数据库迁移和初始化 | 本地 SQLite 验证 | Alembic head 与模型字段一致；空库首次初始化只建管理员、员工、社区和两份问卷。首个迁移版本不是旧 v0.1 数据升级脚本；PostgreSQL 未演练。 |
+| 微信小程序 | 已封存 | `miniapp/` 保留为历史源码，不是当前网页交付入口；恢复该路线需另行联调/验收。 |
+| 提醒/问卷 | 本地验证 | 提醒仅端内待办，无自动推送；两套原创问卷非临床量表，无诊断评分。 |
+| 真实社区试点 | 未验收 | 需机构账户和证据制度、PostgreSQL 备份恢复、HTTPS、报告存储/留存/删除及密钥托管轮换、共享限流、渗透测试、合规评审及医院样本人工验收。 |
+| 正式部署/远端 CI | 未执行 | 本轮仅本地工作树与虚构库；没有发布或生产接入。 |
 
-| 子模块 | 当前状态 | 实现位置 | 事实与限制 |
-|---|---|---|---|
-| API / 数据表 | 实测完成 | `backend/app/models.py`, `main.py` | 开发环境 SQLite `create_all`；生产强制 PostgreSQL（启动校验拒绝 SQLite） |
-| 数据库迁移 | 实测完成（SQLite 验证）/ PostgreSQL 未演练 | `backend/alembic.ini`, `backend/migrations/versions/ead91a9144f3_initial_schema.py`, `tests/test_ops.py::test_alembic_upgrade_and_downgrade` | 初始迁移可 upgrade/downgrade；**生产 PostgreSQL 上的迁移与备份恢复演练仍需人工完成** |
-| 生产工作人员登录 | 实测完成（API 层） | `routes/auth.py /auth/login`, `tests/test_security.py` | 速率限制（10/分钟·账号+IP）、失败 5 次锁 15 分钟、审计、停用检查；**尚未在真实机构账号体系下人工验收** |
-| 密码策略 / 改密 / 全端登出 | 实测完成 | `security.py::validate_password_strength`, `/auth/change-password`, `/auth/logout-all` | 改密与登出提升 `token_version`，旧 JWT 立即失效（有测试）；员工初始密码分发流程需机构制度 |
-| MFA (TOTP) | 实测完成（API 层）/ 机构启用流程未建 | `app/totp.py`, `/auth/mfa/totp`, `/auth/login/totp` | RFC 6238 标准库实现；认证器绑定、丢失恢复为人工流程，未实际验收 |
-| 会话安全 | 实测完成 | `security.py::access_token(tv)`, `deps.py::auth_user` | 令牌携带 token_version，改密/停用/登出即刻失效；默认 8 小时（`SESSION_TTL_MINUTES`） |
-| 速率限制 | 实测完成（单进程） | `app/ratelimit.py` | 进程内滑动窗口；**多 worker 部署必须换共享存储（如 Redis），见 DEPLOYMENT.md** |
-| 微信 code2session 逻辑 | 代码已写未验收 | `routes/auth.py` | 已加 code 一次性防重放、errcode 40029/40163 显式拒绝、IP 限速；**仍缺真实 AppID/Secret 联调** |
-| 角色与社区隔离 | 实测完成（基础+新增边界场景） | `deps.py`, `tests/test_api.py`, `tests/test_security.py` | 跨社区 404、心理答卷仅本人、家属过期/撤回失效均有测试；仍需专业渗透测试 |
-| 居民自主建档 | 实测完成（API）/ 小程序未验收 | `routes/residents.py`, `miniapp/pages/profile` | 自填与明确勾选同意；不能认领线下已有档案 |
-| 线下档案认领 | 实测完成（API 层） | `models.ClaimRequest`, `routes/residents.py`, `tests/test_security.py` | 姓名+手机号匹配仅开申请（响应恒定防枚举、每小时 5 次限额），**必须**同社区员工线下核验后批准；认领不产生护理同意 |
-| 社区协助建档 | 实测完成（API+网页） | `routes/residents.py`, `static/console.html` | 仅登记同意证据编号并进入复核队列；证据真实性仍靠机构制度 |
-| 同意证据复核 | 实测完成（API 层） | `routes/residents.py /community/consent-reviews`, `/community/consent-events/{id}/review` | 纸质同意 pending 入队、复核驳回立即切断员工访问（有测试）；**复核制度与双人抽查需机构落实** |
-| 敏感字段静态加密 | 实测完成（手机号）/ KMS 未接 | `app/crypto.py`（AES-256-GCM）, `models.Resident.phone` | 生产强制 32 字节 base64 密钥（启动校验）；生产密钥管理与轮换流程未建 |
-| 健康数据登记/列表/删除 | 实测完成（API）/ 小程序未验收 | `routes/vitals.py`, `miniapp/pages/vitals` | 有边界校验，无诊断算法 |
-| 健康趋势图 | 代码已写未验收 | `miniapp/pages/vitals/index.js` | 原生 canvas 简单趋势；缺真机多尺寸验收 |
-| 日常问卷模板与作答 | 实测完成（API）/ 小程序未验收 | `routes/questionnaires.py`, `seed.py` | 两份原创非临床演示问卷，无诊断评分；问卷后台编审/版本管理仍未实现 |
-| 心理答案的独立权限 | 实测完成（基础+边界场景） | `routes/questionnaires.py`, `tests/test_api.py` | 家属和工作人员均无心理原始答案读取接口；未做全链路安全审计 |
-| 健康待办与完成 | 实测完成（API）/ 小程序未验收 | `routes/reminders.py` | 仅应用内待办列表，不自动推送 |
-| 微信订阅消息自动提醒 | **未实现** | — | 需要模板、主动授权、生产服务/规则设计 |
-| 家属邀请码+限时授权+撤回 | 实测完成（API）/ 小程序未验收 | `routes/family.py` | v0.2 新增邀请码轮换（旧码立即失效）与家属拒绝授权；小程序 UI 未跟进 |
-| 社区走访计划与完成 | 实测完成（API+网页真实 E2E） | `routes/visits.py`, `static/console.html` | 基本任务闭环；没有复杂分派工作流 |
-| 管理后台 UI | 实测完成（真实后端浏览器 E2E） | `backend/static/console.html` | 2026-10-21 于真实运行后端验证：登录（新 `/auth/login`）、居民列表、协助建档、血压录入、随访完成；管理台仍无复核/认领/账号管理界面 |
-| 管理员账号生命周期 | 实测完成（API 层） | `routes/admin.py`, `tests/test_security.py` | 列表（无凭据/健康字段）、停用（即刻杀会话）、启用；禁止停用自己与管理员 |
-| 安全响应头 / Host 限制 | 实测完成 | `main.py`, `config.py` | nosniff/DENY/no-referrer/CSP 恒定，生产 HSTS+no-store；生产 TrustedHost 需要 `ALLOWED_HOSTS` |
-| 生产配置防护 | 实测完成 | `config.py::validate_settings`, `tests/test_ops.py` | 生产强制：≥48 位密钥、禁演示登录、PostgreSQL、ALLOWED_HOSTS、FIELD_ENCRYPTION_KEY |
-| 真实 AppID 小程序编译/真机 | **已封存**（不再是阻塞项） | `miniapp/` | v0.3 起入口改为网页端，小程序源码保留但不维护；如恢复小程序路线再按原清单验收 |
-| 居民/家属网页端 | 实测完成（真实浏览器端到端） | `backend/static/portal.html`（`/app`） | 登录/建档/记录/趋势/问卷/提醒/邀请码/授权与撤回/家属查看/改密/全端登出均实测；适老化大控件、`prefers-reduced-motion` 支持 |
-| 居民账号开通 / 家属注册 | 实测完成（API 层） | `routes/residents.py /community/accounts`、`routes/auth.py /auth/register-family`、`tests/test_accounts.py` | 员工开通限本社区、初始密码过强度策略；家属注册开放但零权限、IP 限流 10 次/小时；均入审计 |
-| 医疗信息处理合规审查 | **未完成** | `docs/SECURITY_PRIVACY.md` | 不能由代码自动代替 |
-| 测试 | **62 项已通过** | `backend/tests`（test_api 35 + test_security 19 + test_ops 3 + test_accounts 5） | `pytest -q`，覆盖 API 回归+安全边界+生产配置+迁移+账号开通 |
-
-## 不得暗示已经完成的事情
-
-- 不要称“微信正式登录已联调通过”。目前只是写了真实接口、防重放与限速，未接真实凭据。
-- 不要称“自动健康提醒已上线”。它只是应用内待办。
-- 不要称“心理健康筛查准确”。模板不是临床量表。
-- 不要称“已符合《个人信息保护法》”。合规需要实际主体、告知同意、内部制度、供应商、存储地域等条件审查。
-- 不要称“可以直接部署生产”。生产仍需：机构账号开通流程、MFA 启用制度、PostgreSQL 备份恢复演练、HTTPS/反向代理、渗透测试、合规审批。
-- 不要称“多实例限速已解决”。当前限速是单进程内存实现，多 worker 需换共享存储。
+不要把模型目录可用、虚构样本、单机浏览器验证、SQLite 测试或 `healthz` 当成生产通过。健康信息不得在未经合规与安全审批的环境中录入。

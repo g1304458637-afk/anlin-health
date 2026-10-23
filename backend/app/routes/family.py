@@ -90,7 +90,9 @@ def decline_family_grant(resident_id: int, grant_id: int, user: User = Depends(a
 def shared_residents(user: User = Depends(auth_user), db: Session = Depends(get_db)):
     if user.role != "family":
         raise HTTPException(403, "仅家庭成员可使用")
-    grants = db.scalars(select(FamilyGrant).where(FamilyGrant.grantee_id == user.id, FamilyGrant.revoked_at.is_(None)).order_by(FamilyGrant.id.desc())).all()
+    grants = db.scalars(select(FamilyGrant).where(FamilyGrant.grantee_id == user.id,
+        FamilyGrant.revoked_at.is_(None), FamilyGrant.expires_at > datetime.now(timezone.utc))
+        .order_by(FamilyGrant.id.desc())).all()
     result, seen = [], set()
     for g in grants:
         if g.resident_id in seen:
@@ -102,6 +104,7 @@ def shared_residents(user: User = Depends(auth_user), db: Session = Depends(get_
         vitals = active_grant(db, user, r, "vitals")
         if not (profile or vitals):
             continue
-        result.append({"resident_id": r.id, "name": r.name if profile else "授权居民", "can_profile": profile, "can_vitals": vitals})
+        result.append({"resident_id": r.id, "grant_id": g.id, "expires_at": g.expires_at,
+                       "name": r.name if profile else "授权居民", "can_profile": profile, "can_vitals": vitals})
         seen.add(r.id)
     return result

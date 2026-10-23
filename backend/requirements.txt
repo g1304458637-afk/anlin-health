@@ -5,4 +5,8 @@ pydantic==2.13.5
 PyJWT==2.13.0
 httpx==0.28.1
 cryptography>=44.0.1,<46
-# Production PostgreSQL optional: install psycopg[binary]>=3.2,<4 when using DATABASE_URL=postgresql+psycopg://...
+alembic>=1.17,<2
+psycopg[binary]>=3.2,<4
+pypdf==6.10.0
+pypdfium2==5.14.0
+Pillow==12.3.0

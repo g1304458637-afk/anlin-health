@@ -1,0 +1,28 @@
+{
+  "version": "0.6.0-dev",
+  "status": "local development candidate",
+  "date": "2026-10-23",
+  "built_at_utc": "2026-10-23T12:02:54.015574+00:00",
+  "baseline_commit": "1ea6061234da24e03876d77c969da1a0426b94de",
+  "branch": "codex/anlin-web-agent-20261023",
+  "source_worktree": ".",
+  "source_file_count": 137,
+  "source_manifest_sha256": "90d7031a3d5d663e477b05481f4aec45e150d80bd9f73c5e5c573c8e74092e1e",
+  "scope": "source and synthetic verification artifacts excluding BUILD-IDENTITY.json and SHA256SUMS.txt",
+  "verification": {
+    "backend_tests_passed": 133,
+    "frontend_tests_passed": 13,
+    "browser": "real local backend, fictional confirmed report; report opt-in, creatinine77/page2 citation, jump to originalpage2, revocation clears conversation",
+    "deepseek": "final live report glucose, corrected title, missing potassium and medical-boundary cases passed; final browser page2 lookup passed",
+    "bounded_retry": "at most 1 retry for transient transport or malformed structure; rechecks authorization and source before every send",
+    "not_proven": "real hospital accuracy, clinical validity, production readiness or uninterrupted provider availability"
+  },
+  "production_deployed": false,
+  "uses_original_database": false,
+  "publication_intent": {
+    "repository": "https://github.com/g1304458637-afk/anlin-health",
+    "branch": "main",
+    "scope": "source update; no deployment or formal release",
+    "verification": "Remote commit SHA and GitHub Actions are verified separately after push"
+  }
+}

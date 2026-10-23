@@ -11,3 +11,17 @@ miniprogram_npm/
 .vscode/
 .idea/
 coverage.xml
+.runtime/
+private_reports/
+
+# Credentials and SQLite sidecars must not enter Git.
+.env.*
+!.env.example
+!.env.template
+*.sqlite
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal

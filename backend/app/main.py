@@ -1,8 +1,10 @@
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy import text
@@ -10,7 +12,7 @@ from sqlalchemy import text
 from .db import engine, Base
 from .config import settings, validate_settings
 from . import models  # noqa: F401 - registers mappings
-from .routes import auth, residents, vitals, questionnaires, reminders, family, visits, admin
+from .routes import auth, residents, vitals, questionnaires, reminders, family, visits, admin, reporting, assistant, reports, report_assistant
 
 
 @asynccontextmanager
@@ -19,10 +21,19 @@ async def lifespan(app: FastAPI):
     # Pilot convenience only; production requires Alembic-managed schema migrations.
     if settings.app_env != "production":
         Base.metadata.create_all(bind=engine)
-    yield
+    from .report_worker import worker_loop
+    stop = asyncio.Event()
+    worker = asyncio.create_task(worker_loop(stop)) if settings.report_worker_enabled and settings.app_env != "test" else None
+    try:
+        yield
+    finally:
+        stop.set()
+        if worker:
+            worker.cancel()
+            await asyncio.gather(worker, return_exceptions=True)
 
 
-app = FastAPI(title="社区健康管理 API（试点工程）", version="0.3.0", lifespan=lifespan,
+app = FastAPI(title="社区健康管理 API（试点工程）", version="0.6.0", lifespan=lifespan,
     description="供社区和居民使用的健康记录与日常关怀试点系统。非医疗诊断产品。")
 if settings.cors_origins:
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_credentials=False,
@@ -39,7 +50,7 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     # console.html ships inline script/handlers; if you extract them to files, drop 'unsafe-inline'.
     assets = " ".join(settings.csp_asset_origins)
-    img_src = f"'self' data:{' ' + assets if assets else ''}"
+    img_src = f"'self' data: blob:{' ' + assets if assets else ''}"
     media_src = f"'self'{(' ' + assets) if assets else ''}"
     response.headers.setdefault("Content-Security-Policy",
                                 f"default-src 'self'; img-src {img_src}; media-src {media_src}; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'")
@@ -49,15 +60,22 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-for router in [auth.router, residents.router, vitals.router, questionnaires.router, reminders.router, family.router, visits.router, admin.router]:
+for router in [auth.router, residents.router, vitals.router, questionnaires.router, reminders.router, family.router, visits.router, admin.router, reporting.router, assistant.router, reports.router, report_assistant.router]:
     app.include_router(router)
+
+app.mount("/static", StaticFiles(directory=Path(__file__).resolve().parents[1] / "static"), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def index():
+    return RedirectResponse("/app")
 
 
 @app.get("/healthz", tags=["operations"])
 def health():
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
-    return {"status": "ok", "service": "community-health", "version": "0.3.0"}
+    return {"status": "ok", "service": "community-health", "version": "0.6.0"}
 
 
 @app.get("/console", include_in_schema=False)
@@ -68,3 +86,8 @@ def console():
 @app.get("/app", include_in_schema=False)
 def portal():
     return FileResponse(Path(__file__).resolve().parents[1] / "static" / "portal.html")
+
+
+@app.get("/help", include_in_schema=False)
+def help_page():
+    return FileResponse(Path(__file__).resolve().parents[1] / "static" / "help.html")

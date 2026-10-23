@@ -1,7 +1,7 @@
 """Minimal RFC 6238 TOTP (SHA-1, 6 digits, 30s step) using only the standard library.
 
-MFA is optional per deployment: accounts with a provisioned totp_secret must supply
-a valid code at password login. Secrets are stored base32; provisioning URI follows
+MFA is optional per deployment: accounts with a confirmed totp_secret must supply
+a valid code at password login. Secrets are generated as base32; provisioning URI follows
 the conventional otpauth:// format compatible with common authenticator apps.
 """
 import base64

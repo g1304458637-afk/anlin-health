@@ -1,120 +1,117 @@
-# API 接口摘要与调用示例
+# API 摘要与本地示例（v0.6）
 
-所有核心接口均在 `http://127.0.0.1:8000/docs` 提供 OpenAPI 文档，机器可读 JSON 在 `assets/openapi.json`（自动导出）或运行中的 `/openapi.json`。以下仅展示开发演示示例，不包含任何真实居民数据。
+运行后 `/docs` 和 `/openapi.json` 给出当前服务端 schema。仓库中的 `assets/openapi.json` 是历史导出，可能落后于本地候选。以下只使用虚构数据；正式环境需先完成部署与权限验收。
 
-## 1. 登录
-
-### 1.1 工作人员密码登录（生产可用）
+## 登录、会话和 MFA
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"staff","password":"..."}'
+  -d '{"username":"staff","password":"本地演示密码"}'
 ```
 
-防护：账号+IP 每分钟 10 次（429）；连续失败 5 次锁定 15 分钟（423）；已启用 TOTP 的账号返回 401 + `X-MFA-Required: totp`，改用 `/api/auth/login/totp`（body 增加 `totp_code`）。停用账号返回 403。
-
-### 1.2 开发演示登录（生产禁止）
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/auth/dev-login \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"resident","password":"DemoPass2026!"}'
-```
-
-成功返回 `access_token` 和 `user`，令牌默认有效 8 小时（`SESSION_TTL_MINUTES`）。以 `Authorization: Bearer <token>` 访问其他接口。**不要将密码/令牌写入日志或提交到 Git。**
-
-### 1.3 会话与凭据维护
+成功返回 `access_token`；后续请求带 `Authorization: Bearer <token>`。已启用 TOTP 时，普通登录返回 401 和 `X-MFA-Required: totp`，改用 `/api/auth/login/totp` 并提交 `totp_code`。连续失败会锁定账号，登录还有账号/IP 限流；开发专用 `/api/auth/dev-login` 在生产关闭。
 
 | 方法 | 接口 | 作用 |
 |---|---|---|
-| POST | `/api/auth/change-password` | `{"current_password","new_password"}`；旧会话全部立即失效，返回新令牌 |
+| POST | `/api/auth/change-password` | 提交 `current_password`、`new_password`；旧会话失效，返回新令牌 |
 | POST | `/api/auth/logout-all` | 全端登出 |
-| POST | `/api/auth/mfa/totp` | 开通 TOTP，secret 仅显示一次 |
-| DELETE | `/api/auth/mfa/totp` | 关闭 TOTP 并轮换会话 |
-| GET | `/api/auth/demo-status` | 控制台/门户用：是否显示演示登录提示 |
-| 居民 | POST | `/api/community/accounts` | 工作人员为本社区老人开通账号（员工令牌） |
-| 家属 | POST | `/api/auth/register-family` | 家属自助注册（开放、零权限，需居民邀请码授权后才有数据） |
+| POST | `/api/auth/mfa/totp` | 交当前密码；若已有因子，再交现有 `totp_code`；返回仅展示一次的待确认密钥与 URI |
+| POST | `/api/auth/mfa/totp/confirm` | 交当前密码和新认证器 `totp_code`，确认后才启用并轮换会话 |
+| DELETE | `/api/auth/mfa/totp` | 交当前密码和现有 `totp_code`，关闭并轮换会话 |
+| GET | `/api/auth/demo-status` | 开发演示提示状态 |
+| POST | `/api/community/accounts` | 员工为本社区居民开通账号 |
+| POST | `/api/auth/register-family` | 家属自助注册；初始无居民数据权限 |
+| POST | `/api/admin/users` | 管理员提交 `username`、`display_name`、`community_id`、`initial_password`，仅创建固定 `staff` 角色 |
 
-## 2. 对象与流程索引
+## 居民、家属与员工流程
 
-| 端 | 方法 | 接口 | 作用 |
+| 角色 | 方法 | 接口 | 作用 |
 |---|---|---|---|
-| 通用 | POST | `/api/auth/wechat` | 微信 code 换登录态（需要真实配置；code 一次性，重放 401） |
-| 通用 | GET | `/api/me` | 当前角色和邀请码 |
-| 通用 | POST | `/api/me/invite-code/rotate` | 轮换本人邀请码，旧码立即失效 |
-| 通用 | GET | `/api/communities` | 社区选项 |
-| 居民 | POST | `/api/residents/me` | 自主建档和同意 |
-| 居民 | GET | `/api/residents/me` | 当前档案 |
-| 居民 | POST | `/api/residents/claim-requests` | 线下档案认领申请（匹配才入队，响应恒定） |
-| 授权 | POST | `/api/residents/{id}/consents` | 更新社区服务同意/撤回 |
-| 本人/职工/家属 | GET | `/api/residents/{id}` | 按对象级权限读基本档案 |
-| 本人/职工/家属 | GET | `/api/residents/{id}/vitals` | 读取已授权测量 |
-| 本人/职工 | POST | `/api/residents/{id}/vitals` | 添加血压/血糖/体重 |
+| 通用 | GET | `/api/me`、`/api/communities` | 当前账号与社区列表 |
+| 家属/居民 | POST | `/api/me/invite-code/rotate` | 轮换本人邀请码 |
+| 居民 | GET/POST | `/api/residents/me` | 读取/创建本人档案 |
+| 居民 | POST | `/api/residents/claim-requests` | 提交线下档案认领申请，统一 202 响应；未核验前无访问权 |
+| 本人 | GET/POST | `/api/residents/{id}/consents` | 查看、授予或撤回社区护理同意 |
+| 本人/有权访问者 | GET | `/api/residents/{id}`、`/api/residents/{id}/vitals` | 按字段与对象权限读取 |
+| 本人/获准员工 | POST | `/api/residents/{id}/vitals` | 录入手工测量 |
 | 本人 | DELETE | `/api/residents/{id}/vitals/{vid}` | 删除本人测量 |
-| 通用 | GET | `/api/questionnaires` | 取得已发布示例问卷 |
-| 本人/受限职工 | POST | `/api/residents/{id}/responses` | 提交问卷，职工不得提交情绪类 |
-| 本人 | GET | `/api/residents/{id}/responses` | 本人读原始答卷 |
-| 本人/职工 | GET,POST | `/api/residents/{id}/reminders` | 待办管理 |
-| 本人/职工 | PATCH | `/api/residents/{id}/reminders/{rid}/complete` | 标记完成 |
-| 本人 | POST | `/api/residents/{id}/family-grants` | 按邀请码授权家属 |
-| 本人 | GET | `/api/residents/{id}/family-grants` | 查看授权历史 |
-| 本人 | DELETE | `/api/residents/{id}/family-grants/{gid}` | 撤回授权 |
-| 家属 | POST | `/api/residents/{id}/family-grants/{gid}/decline` | 家属拒绝此授权 |
-| 家属 | GET | `/api/family/shared-residents` | 查看有权访问的居民 |
-| 职工 | GET/POST | `/api/community/residents` | 同社区居民列表/协助建档（纸质同意入复核队列） |
-| 职工 | GET | `/api/community/claim-requests?status=pending` | 待核验认领申请 |
-| 职工 | POST | `/api/community/claim-requests/{id}/review` | 批准/拒绝认领（线下核验后） |
-| 职工 | GET | `/api/community/consent-reviews` | 待复核同意证据 |
-| 职工 | POST | `/api/community/consent-events/{id}/review` | 复核通过/驳回（驳回即切断访问） |
-| 职工 | GET/POST | `/api/community/visits` | 计划随访与任务清单 |
-| 职工 | PATCH | `/api/community/visits/{id}/finish` | 完成随访 |
-| 管理员 | GET | `/api/admin/summary` | 只读全局聚合 |
-| 管理员 | GET | `/api/admin/users` | 账号列表（无凭据/健康数据） |
-| 管理员 | POST | `/api/admin/users/{id}/deactivate` | 停用并立即终止其会话 |
-| 管理员 | POST | `/api/admin/users/{id}/activate` | 启用并解锁 |
+| 本人 | GET/POST | `/api/residents/{id}/reminders` | 端内待办，支持 `limit`、`offset` |
+| 本人 | PATCH | `/api/residents/{id}/reminders/{rid}/complete` | 标记完成 |
+| 本人 | GET/POST/DELETE | `/api/residents/{id}/family-grants[/{gid}]` | 查询、授予、撤回家属授权；提交家属自己的邀请码 |
+| 家属 | GET | `/api/family/shared-residents` | 有效授权档案与可见字段 |
+| 家属 | POST | `/api/residents/{id}/family-grants/{gid}/decline` | 拒绝授权 |
+| 职工 | GET/POST | `/api/community/residents` | 过滤分页列表与协助建档；纸质同意先待复核 |
+| 职工 | GET / POST | `/api/community/claim-requests` / `/api/community/claim-requests/{id}/review` | 待核验申请 / 现场核验结果 |
+| 职工 | GET / POST | `/api/community/consent-reviews` / `/api/community/consent-events/{id}/review` | 待复核纸质同意 / 独立审批 |
+| 职工 | GET | `/api/community/health-stats?limit=25&offset=0&q=` | 有效同意范围内聚合、日计数和分页居民记录 |
+| 职工 | GET/POST/PATCH | `/api/community/visits`、`/api/community/visits/{id}/finish` | 随访任务 |
+| 管理员 | GET / GET,POST | `/api/admin/summary` / `/api/admin/users` | 聚合 / 账号列表与固定员工角色创建；无个人健康正文 |
+| 管理员 | POST | `/api/admin/users/{id}/deactivate`、`/api/admin/users/{id}/activate` | 停用或启用非管理员账号 |
 
-## 3. 血压录入 JSON
+认领申请体示例：
 
 ```json
-{"type":"blood_pressure","systolic":123,"diastolic":78}
+{"resident_id":5,"full_name":"与档案一致的姓名","phone":"与档案一致的电话","note":"自愿填写的说明"}
 ```
 
-## 4. 血糖录入 JSON
+家属授权体示例：
 
 ```json
-{"type":"blood_glucose","glucose_mmol_l":5.6}
+{"invite_code":"家属账号自己的邀请码","can_profile":true,"can_vitals":true,"expires_in_days":30}
 ```
 
-## 5. 授予家属查看权 JSON
+问卷接口为 `/api/questionnaires` 和 `/api/residents/{id}/responses`；两套模板是原创非临床示例，原始答案仅档案本人读取。
+
+## 私人报告：上传、逐页提取与人工确认
+
+报告接口仅档案本人或有效社区护理同意下的同社区员工可用。家属即使获测量授权、管理员即使有聚合权限，也不能读取原件、页面、候选或审核内容。
+
+| 方法 | 接口 | 作用 |
+|---|---|---|
+| POST | `/api/residents/{id}/reports?filename=...` | 原始二进制请求体上传；`Content-Type` 必须与实际 PDF/PNG/JPEG/WebP 一致，最多 10 MiB、5 页 |
+| GET | `/api/residents/{id}/reports?limit=20&offset=0` | 私人报告列表及总数 |
+| GET | `/api/reports/{id}` | 状态、未核对候选与已确认内容分开返回 |
+| GET | `/api/reports/{id}/original` | 下载经 SHA-256 校验的原件 |
+| GET | `/api/reports/{id}/pages/{page}` | 渲染指定页 PNG，页码从 1 起 |
+| POST | `/api/reports/{id}/extract` | `{"allow_cloud":true}`；仅用户明确允许该报告发送 DeepSeek 后排队，返回 202 |
+| POST | `/api/reports/{id}/confirm` | 人工核对身份、版本和字段后保存；可不导入任何健康指标 |
+
+例如上传仓库中的**虚构**样本（先替换本地 `居民ID` 与令牌）：
+
+```bash
+curl -X POST 'http://127.0.0.1:8000/api/residents/居民ID/reports?filename=fictional-two-page-report.pdf' \
+  -H 'Authorization: Bearer 本地令牌' -H 'Content-Type: application/pdf' \
+  --data-binary @assets/report-samples/fictional-two-page-report.pdf
+```
+
+上传本身不访问 DeepSeek。提取时，原生 PDF 若有足够文字且无图像，则逐页传文字；其他页传渲染图，**其中可能包含报告上的姓名和全部检验结果**。队列在数据库中，内嵌 worker 或独立 `python -m app.report_worker` 处理；每页发送前重查授权。处理中断且 7 分钟租约失效后，状态为失败，须用户主动再点重试，最多 3 次。草稿中的 `quote` 是转录片段；图像页引用本身仍由模型生成，不是可验证 OCR 坐标或准确率。
+
+`confirm` 使用 GET 详情返回的 `revision` 和候选 `items`，由人对照原件核对字段并设置 `identity_confirmed:true`。`items` 的 `id`、`page`、`quote` 不可修改；可修正名称、值、单位、参考范围、标记。`imports` 可为空；只有明确选中的血压（mmHg）、血糖（mmol/L）、体重（kg），在名称/值/单位严格吻合且填写**实际测量时间与时区**时才能入库。其他实验室项目只留在确认报告中。两个页面与 11 条 golden 的虚构样本仅供功能回归，不代表真实材料识别准确率。
+
+## DeepSeek 助手
+
+`GET /api/assistant/status` 需登录，返回是否配置、供应商、模型名及功能说明，不返回密钥。`POST /api/assistant/chat` 同样需登录：
 
 ```json
-{"invite_code":"输入家庭用户自己的邀请码","can_profile":true,"can_vitals":true,"expires_in_days":30}
+{"message":"如何授权家人查看？","history":[],"allow_health_data":false}
 ```
 
-## 6. 日常健康问卷提交示例
+默认仅回答网站帮助并给出 `/help` 来源和导航。设 `allow_health_data=true` 后，模型可调用当前身份的只读数量/日期工具；工具不接受任意居民 ID，不发送姓名、电话、提醒标题、原始测量或问卷答案，也不执行写操作。**用户输入的 `message` 和 `history` 会发送给 DeepSeek**。本地验证模型为 `deepseek-flash`；供应商正式使用仍需审查。
+
+已确认报告的问答走独立接口 `POST /api/assistant/report-chat`。从报告详情点“询问这份报告”后，针对这一份报告单独勾选许可；每次请求仍须提交 `allow_report_data:true`：
 
 ```json
-{"questionnaire_id":1,"answers":{"activity":"10to30","sleep":"average","help":"yes"}}
+{"report_id":42,"message":"这份报告列出了哪些项目？","history":[],"allow_report_data":true}
 ```
 
-答案必须覆盖问卷全部题目且完全匹配合法选项。原始答卷只有档案本人可以读取。
+仅报告本人或获有效护理同意的同社区员工可用；家属和管理员无权调用。响应包含 `answer`、`evidence_status`、`sources` 和当前 `report` 元数据。每个来源由服务端构造，含 `id`、`report_id`、`revision`、`filename`、`title`、`page`、`quote`、`confirmed_fields`、`edited_fields`、`source_kind`；其中 `quote`/`page` 来自不可更改的候选原文定位，`confirmed_fields` 来自人工审核值，`source_kind=model_transcription` 表示图片页原文只是模型转录，须打开授权页面核对。证据不足时返回 `evidence_status=insufficient_evidence`，医疗问题返回 `medical_guidance_limited`；不得将回答当作诊断或用药意见。
 
-## 7. 认领申请 JSON（居民端）
+DeepSeek 接收问题、历史和当前报告的已确认字段上下文，**不接收本次问答的原始 PDF/图片、其他报告或未核对草稿**；模型仅选择服务端允许的证据编号和意图，引用文字及页码不由模型临时生成。服务端在模型调用前后复核对象权限、会话版本、报告版本、内容哈希和原件 SHA-256。每账号限 6 次/分钟，上下文最多 100 项/40000 字符，回答最多 8 个来源；摘要若只列出部分项目会显示已列与总数。问答不写健康记录，也不保存对话正文。
 
-```json
-{"resident_id":5,"full_name":"与档案一致的姓名","phone":"与档案一致的手机号","note":"备注"}
-```
+## 常见错误
 
-无论信息是否匹配，返回相同的 `202 {"status":"submitted",...}`；只有匹配的申请进入社区待核验列表，**批准前不会获得任何数据访问**。
+- `401`：未登录、令牌失效、TOTP 要求或验证码错误；`403`：角色禁止/停用；`404`：对象不存在或无权访问；`409`：已建档、已复核等冲突；`422`：数据不合法；`423`：暂时锁定；`429`：触发限流。
+- `503`：微信或助手服务未配置/暂不可用；`504`：助手回答超时。自动化测试与本地预览不能代替正式服务可用性验证。
 
-## 8. 关键错误语义
-
-- 401：未登录、令牌过期/被轮换，或微信凭据无效/重放。
-- 403：操作在角色上禁止（例如家属试图提交问卷、普通居民转为工作人员）或账号已停用。
-- 404：目标不存在或该账号无对象级权限，避免泄露他人档案存在性。
-- 409：冲突，例如本人已建档、申请已复核、档案已被认领。
-- 422：输入不符合数据或同意约束。
-- 423：账号因连续登录失败被临时锁定。
-- 429：触发速率限制（登录/微信登录/认领申请）。
-- 503：微信接口配置缺失或官方接口临时不可用。
+报告问答可能在连接或结构错误时自动重试一次，每次重新检查访问权；路由总时限40秒。无效引用会返回503，授权或版本变化分别返回401/404/409；错误均不带报告正文。

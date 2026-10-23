@@ -1,0 +1,36 @@
+{
+  "verified_at_utc": "2026-10-23T09:39:35.865757+00:00",
+  "data": "fictional test fixtures only",
+  "scope": "local real API, database queue and DeepSeek; not clinical accuracy calibration",
+  "checks": [
+    {
+      "sample": "fictional-two-page-report.pdf",
+      "sha256": "a03e74664a822a7b590796e1851e3445ec14bf6f6bc5b77e010eb3837dd43a37",
+      "model": "deepseek-flash",
+      "method": "deepseek-text",
+      "status": "draft",
+      "expected_item_count": 11,
+      "actual_item_count": 11,
+      "item_differences": [],
+      "candidate_title": "检验报告",
+      "reviewed_title": null,
+      "imported_vitals": 0,
+      "identical_confirmation_replay_verified": false
+    },
+    {
+      "sample": "fictional-first-page-scan.png",
+      "sha256": "11e129593872beeb1e6c64457936cfd963852c16616fde0ab5a671f21f69c2dc",
+      "model": "deepseek-flash",
+      "method": "deepseek-vision",
+      "status": "confirmed",
+      "expected_item_count": 6,
+      "actual_item_count": 6,
+      "item_differences": [],
+      "candidate_title": "检验报告",
+      "reviewed_title": "检验记录功能测试单",
+      "imported_vitals": 3,
+      "identical_confirmation_replay_verified": true
+    }
+  ],
+  "browser": "PNG uploaded, opt-in extracted, reviewed title corrected, 3 vitals confirmed; timeline checked"
+}

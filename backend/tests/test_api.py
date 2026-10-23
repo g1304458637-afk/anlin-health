@@ -45,7 +45,8 @@ def test_assisted_creation_needs_documented_consent(client,token):
     assert client.post('/api/community/residents',json={**payload,'community_id':2},headers=h).status_code==403
     good=client.post('/api/community/residents',json=payload,headers=h)
     assert good.status_code==201
-    assert good.json()['consent_active'] is True
+    assert good.json()['consent_active'] is False
+    assert client.get(f"/api/residents/{good.json()['id']}", headers=h).status_code == 404
 
 
 def test_cross_community_denial(client,token):

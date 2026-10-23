@@ -1,4 +1,4 @@
-name: Backend and miniapp static checks
+name: Backend and web checks
 on:
   push:
   pull_request:
@@ -18,6 +18,10 @@ jobs:
       - name: Test backend
         working-directory: backend
         run: python -m pytest -q
+      - name: Check embedded web JavaScript
+        run: python backend/scripts/check_web_syntax.py
+      - name: Test web session and workflow regressions
+        run: node --test frontend/tests/*.test.mjs
       - name: Validate miniapp source syntax
         run: |
           node --version

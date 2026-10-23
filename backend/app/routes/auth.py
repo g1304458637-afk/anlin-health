@@ -14,7 +14,8 @@ from ..ratelimit import login_limiter, wechat_limiter, register_limiter, client_
 from ..security import verify_password, validate_password_strength, hash_password, access_token, new_invite_code
 from ..deps import auth_user, audit
 from ..totp import verify_totp
-from ..schemas import LoginIn, WxLoginIn, PasswordChangeIn, TotpLoginIn, RegisterFamilyIn, UserOut
+from ..schemas import (LoginIn, WxLoginIn, PasswordChangeIn, TotpLoginIn, RegisterFamilyIn, UserOut,
+                       TotpSetupIn, TotpConfirmIn, TotpDisableIn)
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -50,6 +51,40 @@ def _issue_login(user: User, db: Session, action: str) -> dict:
     return {"access_token": access_token(user.id, user.token_version), "token_type": "bearer", "user": user_out(user)}
 
 
+def _check_login_lock(user: User | None, now: datetime) -> None:
+    if user and user.locked_until and user.locked_until.replace(tzinfo=None) > now.replace(tzinfo=None):
+        raise HTTPException(423, "账号已临时锁定，请稍后再试或联系管理员")
+
+
+def _record_login_failure(user: User | None, db: Session, now: datetime, action: str) -> None:
+    if user:
+        user.failed_login_count += 1
+        audit(db, user, action, "user", user.id)
+        if user.failed_login_count >= settings.login_max_attempts:
+            user.locked_until = now + timedelta(minutes=settings.login_lockout_minutes)
+            audit(db, user, "account_locked", "user", user.id)
+        db.commit()
+
+
+def _verify_mfa_password(user: User, password: str, db: Session) -> None:
+    now = datetime.now(timezone.utc)
+    _check_login_lock(user, now)
+    if not verify_password(password, user.password_hash):
+        _record_login_failure(user, db, now, "mfa_password_failed")
+        raise HTTPException(401, "当前密码不正确")
+
+
+def _verify_current_factor(user: User, code: str | None, db: Session) -> None:
+    if not verify_totp(user.totp_secret, code):
+        _record_login_failure(user, db, datetime.now(timezone.utc), "mfa_totp_failed")
+        raise HTTPException(401, "当前两步验证码不正确")
+
+
+def _clear_auth_failures(user: User) -> None:
+    user.failed_login_count = 0
+    user.locked_until = None
+
+
 @router.post("/auth/login")
 def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     """Production-capable username/password login (staff provisioned out-of-band).
@@ -62,18 +97,10 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
         raise HTTPException(429, "尝试过于频繁，请稍后再试")
     user = db.scalar(select(User).where(User.username == body.username))
     now = datetime.now(timezone.utc)
+    _check_login_lock(user, now)
     if not user or not verify_password(body.password, user.password_hash):
-        if user:
-            user.failed_login_count += 1
-            if user.failed_login_count >= settings.login_max_attempts:
-                user.locked_until = now + timedelta(minutes=settings.login_lockout_minutes)
-                audit(db, user, "account_locked", "user", user.id)
-            db.commit()
+        _record_login_failure(user, db, now, "password_login_failed")
         raise HTTPException(401, "用户名或密码错误")
-    if user.locked_until:
-        if user.locked_until.replace(tzinfo=None) > now.replace(tzinfo=None):
-            raise HTTPException(423, "账号已临时锁定，请稍后再试或联系管理员")
-        user.locked_until = None
     if not user.is_active:
         raise HTTPException(403, "账号已停用")
     if user.totp_secret:
@@ -83,20 +110,20 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
 
 @router.post("/auth/login/totp")
 def login_totp(body: TotpLoginIn, request: Request, db: Session = Depends(get_db)):
-    key = f"totp:{client_ip(request)}:{body.username}"
+    key = f"{client_ip(request)}:{body.username}"
     if not login_limiter.hit(key, settings.login_rate_per_minute):
         raise HTTPException(429, "尝试过于频繁，请稍后再试")
     user = db.scalar(select(User).where(User.username == body.username))
+    now = datetime.now(timezone.utc)
+    _check_login_lock(user, now)
     if not user or not user.totp_secret or not verify_password(body.password, user.password_hash):
+        _record_login_failure(user, db, now, "password_login_failed")
         raise HTTPException(401, "用户名或密码错误")
-    if not verify_totp(user.totp_secret, body.totp_code):
-        audit(db, user, "totp_failed", "user", user.id)
-        db.commit()
-        raise HTTPException(401, "两步验证码不正确")
     if not user.is_active:
         raise HTTPException(403, "账号已停用")
-    if user.locked_until and user.locked_until.replace(tzinfo=None) > datetime.now(timezone.utc).replace(tzinfo=None):
-        raise HTTPException(423, "账号已临时锁定，请稍后再试或联系管理员")
+    if not verify_totp(user.totp_secret, body.totp_code):
+        _record_login_failure(user, db, now, "totp_failed")
+        raise HTTPException(401, "两步验证码不正确")
     return _issue_login(user, db, "password_login_totp")
 
 
@@ -143,24 +170,62 @@ def logout_all(user: User = Depends(auth_user), db: Session = Depends(get_db)):
 
 
 @router.post("/auth/mfa/totp")
-def setup_totp(user: User = Depends(auth_user), db: Session = Depends(get_db)):
-    """Provision (or rotate) a TOTP secret; the secret is shown exactly once."""
+def setup_totp(body: TotpSetupIn, user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    """Stage a new factor; the active factor remains usable until confirmation."""
     from ..totp import new_totp_secret, provisioning_uri
-    user.totp_secret = new_totp_secret()
-    audit(db, user, "mfa_totp_provisioned", "user", user.id)
+    _verify_mfa_password(user, body.current_password, db)
+    if user.totp_secret:
+        _verify_current_factor(user, body.totp_code, db)
+    secret = new_totp_secret()
+    user.totp_pending_secret = secret
+    user.totp_pending_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    user.totp_pending_failures = 0
+    _clear_auth_failures(user)
+    audit(db, user, "mfa_totp_staged", "user", user.id)
     db.commit()
-    return {"secret": user.totp_secret, "uri": provisioning_uri(user.totp_secret, user.username)}
+    return {"secret": secret, "uri": provisioning_uri(secret, user.username)}
+
+
+@router.post("/auth/mfa/totp/confirm")
+def confirm_totp(body: TotpConfirmIn, user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    _verify_mfa_password(user, body.current_password, db)
+    now = datetime.now(timezone.utc)
+    if not user.totp_pending_secret or not user.totp_pending_expires_at or user.totp_pending_expires_at.replace(tzinfo=None) <= now.replace(tzinfo=None):
+        raise HTTPException(409, "待确认的两步验证已失效，请重新设置")
+    if not verify_totp(user.totp_pending_secret, body.totp_code):
+        user.totp_pending_failures += 1
+        if user.totp_pending_failures >= 5:
+            user.totp_pending_secret = None
+            user.totp_pending_expires_at = None
+            user.totp_pending_failures = 0
+        _record_login_failure(user, db, now, "mfa_totp_confirm_failed")
+        raise HTTPException(401, "两步验证码不正确")
+    user.totp_secret = user.totp_pending_secret
+    user.totp_pending_secret = None
+    user.totp_pending_expires_at = None
+    user.totp_pending_failures = 0
+    _clear_auth_failures(user)
+    user.token_version += 1
+    audit(db, user, "mfa_totp_enabled", "user", user.id)
+    db.commit()
+    return {"access_token": access_token(user.id, user.token_version), "token_type": "bearer"}
 
 
 @router.delete("/auth/mfa/totp")
-def disable_totp(user: User = Depends(auth_user), db: Session = Depends(get_db)):
+def disable_totp(body: TotpDisableIn, user: User = Depends(auth_user), db: Session = Depends(get_db)):
     if not user.totp_secret:
         raise HTTPException(404, "未开启两步验证")
+    _verify_mfa_password(user, body.current_password, db)
+    _verify_current_factor(user, body.totp_code, db)
     user.totp_secret = None
+    user.totp_pending_secret = None
+    user.totp_pending_expires_at = None
+    user.totp_pending_failures = 0
+    _clear_auth_failures(user)
     user.token_version += 1
     audit(db, user, "mfa_totp_disabled", "user", user.id)
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "access_token": access_token(user.id, user.token_version), "token_type": "bearer"}
 
 
 async def exchange_wechat_code(code: str) -> str:

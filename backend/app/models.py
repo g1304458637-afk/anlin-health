@@ -31,7 +31,10 @@ class User(Base):
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Optional TOTP factor; presence forces the code at password login.
-    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    totp_secret: Mapped[str | None] = mapped_column(EncryptedString(200), nullable=True)
+    totp_pending_secret: Mapped[str | None] = mapped_column(EncryptedString(200), nullable=True)
+    totp_pending_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    totp_pending_failures: Mapped[int] = mapped_column(Integer, default=0)
     # Raised on password change / global sign-out; older tokens stop working immediately.
     token_version: Mapped[int] = mapped_column(Integer, default=0)
     password_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -62,7 +65,7 @@ class ClaimRequest(Base):
     community_id: Mapped[int] = mapped_column(ForeignKey("communities.id"), index=True)
     status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending/approved/rejected
     stated_name: Mapped[str] = mapped_column(String(80))
-    stated_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    stated_phone: Mapped[str | None] = mapped_column(EncryptedString(200), nullable=True)
     name_matched: Mapped[bool] = mapped_column(Boolean, default=False)
     phone_matched: Mapped[bool] = mapped_column(Boolean, default=False)
     note: Mapped[str | None] = mapped_column(String(300), nullable=True)
@@ -169,3 +172,6 @@ class AuditLog(Base):
 
 
 Index("ix_family_active", FamilyGrant.resident_id, FamilyGrant.grantee_id)
+
+# Register private report tables for create_all and Alembic metadata discovery.
+from .report_models import MedicalReport, ReportVitalLink  # noqa: E402,F401

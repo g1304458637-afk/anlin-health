@@ -1,0 +1,96 @@
+{
+  "verified_at_utc": "2026-10-23T10:21:54.707831+00:00",
+  "scope": "real local API and real DeepSeek, fictional confirmed report only",
+  "sample_sha256": "a03e74664a822a7b590796e1851e3445ec14bf6f6bc5b77e010eb3837dd43a37",
+  "checks": [
+    {
+      "case": "glucose",
+      "question": "这份报告血糖是多少，参考范围和标记是什么？",
+      "answer": "第1页已确认的血糖：5.8 mmol/L；已确认参考范围：3.9-6.1；已确认标记：N。",
+      "evidence_status": "supported",
+      "sources": [
+        {
+          "id": "p1-i2",
+          "report_id": 2,
+          "revision": 1,
+          "filename": "fictional-two-page-report.pdf",
+          "title": "检验记录功能测试单",
+          "page": 1,
+          "quote": "血糖  GLU\n5.8\nmmol/L\n3.9-6.1\nN",
+          "confirmed_fields": {
+            "name": "血糖",
+            "value": "5.8",
+            "unit": "mmol/L",
+            "reference_range": "3.9-6.1",
+            "flag": "N"
+          },
+          "edited_fields": [],
+          "source_kind": "pdf_text"
+        }
+      ],
+      "model": "deepseek-flash"
+    },
+    {
+      "case": "title",
+      "question": "这份报告的名称是什么？",
+      "answer": "第1页已确认的报告标题：检验记录功能测试单。",
+      "evidence_status": "supported",
+      "sources": [
+        {
+          "id": "meta:title",
+          "report_id": 2,
+          "revision": 1,
+          "filename": "fictional-two-page-report.pdf",
+          "title": "检验记录功能测试单",
+          "page": 1,
+          "quote": "检验记录功能测试单",
+          "confirmed_fields": {
+            "field": "title",
+            "label": "报告标题",
+            "value": "检验记录功能测试单"
+          },
+          "edited_fields": [
+            "title"
+          ],
+          "source_kind": "pdf_text"
+        }
+      ],
+      "model": "deepseek-flash"
+    },
+    {
+      "case": "missing",
+      "question": "这份报告的血钾是多少？",
+      "answer": "已确认报告中没有足够的可定位依据回答这个问题，请对照原件或询问专业人员。",
+      "evidence_status": "insufficient_evidence",
+      "sources": [],
+      "model": "deepseek-flash"
+    },
+    {
+      "case": "medical",
+      "question": "这份报告血糖正常吗？需要服药吗？",
+      "answer": "第1页已确认的血糖：5.8 mmol/L；已确认参考范围：3.9-6.1；已确认标记：N。这些仅是报告中的已确认记录；我不能判断是否正常、诊断疾病或给出治疗和用药建议，请咨询专业医护人员。",
+      "evidence_status": "medical_guidance_limited",
+      "sources": [
+        {
+          "id": "p1-i2",
+          "report_id": 2,
+          "revision": 1,
+          "filename": "fictional-two-page-report.pdf",
+          "title": "检验记录功能测试单",
+          "page": 1,
+          "quote": "血糖  GLU\n5.8\nmmol/L\n3.9-6.1\nN",
+          "confirmed_fields": {
+            "name": "血糖",
+            "value": "5.8",
+            "unit": "mmol/L",
+            "reference_range": "3.9-6.1",
+            "flag": "N"
+          },
+          "edited_fields": [],
+          "source_kind": "pdf_text"
+        }
+      ],
+      "model": "deepseek-flash"
+    }
+  ]
+}
