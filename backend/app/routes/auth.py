@@ -1,3 +1,4 @@
+import re
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -9,13 +10,15 @@ from sqlalchemy import select
 from ..db import get_db
 from ..config import settings
 from ..models import User, Resident
-from ..ratelimit import login_limiter, wechat_limiter, client_ip
+from ..ratelimit import login_limiter, wechat_limiter, register_limiter, client_ip
 from ..security import verify_password, validate_password_strength, hash_password, access_token, new_invite_code
 from ..deps import auth_user, audit
 from ..totp import verify_totp
-from ..schemas import LoginIn, WxLoginIn, PasswordChangeIn, TotpLoginIn, UserOut
+from ..schemas import LoginIn, WxLoginIn, PasswordChangeIn, TotpLoginIn, RegisterFamilyIn, UserOut
 
 router = APIRouter(prefix="/api", tags=["auth"])
+
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-\u4e00-\u9fa5]{4,40}$")  # 中文用户名对老年居民更友好
 
 # One-time WeChat codes: a replayed code is rejected without contacting WeChat again.
 _used_wx_codes: dict[str, float] = {}
@@ -199,6 +202,28 @@ async def wechat_login(body: WxLoginIn, request: Request, db: Session = Depends(
     if not user.is_active:
         raise HTTPException(403, "账号不可用")
     return _issue_login(user, db, "wechat_login")
+
+
+@router.post("/auth/register-family", status_code=201)
+def register_family(body: RegisterFamilyIn, request: Request, db: Session = Depends(get_db)):
+    """Open family self-registration: a family account holds no data access until
+    a resident redeems their secret invite code to grant it."""
+    if not USERNAME_RE.fullmatch(body.username):
+        raise HTTPException(422, "用户名需为4-40位字母、数字或_.-")
+    if not register_limiter.hit(f"register:{client_ip(request)}", 10, window_seconds=3600):
+        raise HTTPException(429, "注册过于频繁，请稍后再试")
+    if db.scalar(select(User.id).where(User.username == body.username)):
+        raise HTTPException(409, "用户名已被使用")
+    reason = validate_password_strength(body.password)
+    if reason:
+        raise HTTPException(422, reason)
+    user = User(username=body.username, display_name=body.display_name, role="family",
+                invite_code=new_invite_code(), password_hash=hash_password(body.password))
+    db.add(user)
+    db.flush()
+    audit(db, user, "register_family", "user", user.id)
+    db.commit()
+    return {"access_token": access_token(user.id, user.token_version), "token_type": "bearer", "user": user_out(user)}
 
 
 @router.get("/me", response_model=UserOut)

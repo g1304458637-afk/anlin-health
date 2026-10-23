@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="社区健康管理 API（试点工程）", version="0.2.0", lifespan=lifespan,
+app = FastAPI(title="社区健康管理 API（试点工程）", version="0.3.0", lifespan=lifespan,
     description="供社区和居民使用的健康记录与日常关怀试点系统。非医疗诊断产品。")
 if settings.cors_origins:
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_credentials=False,
@@ -57,9 +57,14 @@ for router in [auth.router, residents.router, vitals.router, questionnaires.rout
 def health():
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
-    return {"status": "ok", "service": "community-health", "version": "0.2.0"}
+    return {"status": "ok", "service": "community-health", "version": "0.3.0"}
 
 
 @app.get("/console", include_in_schema=False)
 def console():
     return FileResponse(Path(__file__).resolve().parents[1] / "static" / "console.html")
+
+
+@app.get("/app", include_in_schema=False)
+def portal():
+    return FileResponse(Path(__file__).resolve().parents[1] / "static" / "portal.html")

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import re
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
@@ -6,11 +7,14 @@ from ..db import get_db
 from ..config import settings
 from ..models import User, Resident, Community, ConsentEvent, ClaimRequest
 from ..deps import auth_user, require_roles, check_access, is_owner, is_staff_for, consent_active, audit
-from ..ratelimit import claim_limiter, client_ip
+from ..ratelimit import claim_limiter, provision_limiter, client_ip
+from ..security import validate_password_strength, hash_password, new_invite_code
 from ..schemas import (ResidentOut, SelfResidentIn, AssistedResidentIn, ResidentPatch, ConsentIn, ConsentOut,
-                       ConsentReviewIn, ClaimRequestIn, ClaimRequestOut, ClaimReviewIn)
+                       ConsentReviewIn, ClaimRequestIn, ClaimRequestOut, ClaimReviewIn, ProvisionAccountIn)
 
 router = APIRouter(prefix="/api", tags=["residents"])
+
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-\u4e00-\u9fa5]{4,40}$")  # 中文用户名对老年居民更友好
 
 
 def serialize(db: Session, resident: Resident, user: User) -> ResidentOut:
@@ -140,6 +144,33 @@ def community_stats(user: User = Depends(require_roles("staff")), db: Session = 
     # Aggregate only. Never include questionnaire raw answers in dashboard.
     active = [rid for rid in ids if consent_active(db, rid)]
     return {"resident_count": len(active), "community_id": user.community_id}
+
+
+# ---- 居民账号开通（网页端） -----------------------------------------------
+# 工作人员为本社区老人开通登录账号；居民数据访问边界不因此改变。
+
+@router.post("/community/accounts", status_code=201)
+def provision_account(body: ProvisionAccountIn, user: User = Depends(require_roles("staff")), db: Session = Depends(get_db)):
+    if not user.community_id:
+        raise HTTPException(403, "账号未关联社区，不能开通居民账号")
+    if not provision_limiter.hit(f"provision:{user.id}", 30, window_seconds=3600):
+        raise HTTPException(429, "开通过于频繁，请稍后再试")
+    if not USERNAME_RE.fullmatch(body.username):
+        raise HTTPException(422, "用户名需为4-40位字母、数字或_.-")
+    if db.scalar(select(User.id).where(User.username == body.username)):
+        raise HTTPException(409, "用户名已被使用")
+    reason = validate_password_strength(body.initial_password)
+    if reason:
+        raise HTTPException(422, reason)
+    account = User(username=body.username, display_name=body.display_name, role="resident",
+                   community_id=user.community_id, invite_code=new_invite_code(),
+                   password_hash=hash_password(body.initial_password))
+    db.add(account)
+    db.flush()
+    audit(db, user, "provision_resident_account", "user", account.id)
+    db.commit()
+    return {"id": account.id, "username": account.username, "display_name": account.display_name,
+            "role": account.role, "community_id": account.community_id}
 
 
 # ---- Offline archive claiming -------------------------------------------------

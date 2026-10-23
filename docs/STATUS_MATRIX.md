@@ -1,6 +1,6 @@
 # 当前完成情况：真实状态表
 
-**截至 2026-10-21 · v0.2 安全加固批次后；本包是开发试点，不是生产系统。**
+**截至 2026-10-23 · v0.3 全网页端批次后；本包是开发试点，不是生产系统。**
 
 状态只用三种：**实测完成**（有自动化测试或真实运行证据）/ **代码已写未验收**（缺真实环境或人工验收）/ **未实现**。
 
@@ -32,9 +32,11 @@
 | 管理员账号生命周期 | 实测完成（API 层） | `routes/admin.py`, `tests/test_security.py` | 列表（无凭据/健康字段）、停用（即刻杀会话）、启用；禁止停用自己与管理员 |
 | 安全响应头 / Host 限制 | 实测完成 | `main.py`, `config.py` | nosniff/DENY/no-referrer/CSP 恒定，生产 HSTS+no-store；生产 TrustedHost 需要 `ALLOWED_HOSTS` |
 | 生产配置防护 | 实测完成 | `config.py::validate_settings`, `tests/test_ops.py` | 生产强制：≥48 位密钥、禁演示登录、PostgreSQL、ALLOWED_HOSTS、FIELD_ENCRYPTION_KEY |
-| 真实 AppID 小程序编译/真机 | **未验收** | `miniapp` | 缺微信开发者工具/微信环境证据；v0.2 仅做静态加固（防重复提交、GET 重试、演示登录开关） |
+| 真实 AppID 小程序编译/真机 | **已封存**（不再是阻塞项） | `miniapp/` | v0.3 起入口改为网页端，小程序源码保留但不维护；如恢复小程序路线再按原清单验收 |
+| 居民/家属网页端 | 实测完成（真实浏览器端到端） | `backend/static/portal.html`（`/app`） | 登录/建档/记录/趋势/问卷/提醒/邀请码/授权与撤回/家属查看/改密/全端登出均实测；适老化大控件、`prefers-reduced-motion` 支持 |
+| 居民账号开通 / 家属注册 | 实测完成（API 层） | `routes/residents.py /community/accounts`、`routes/auth.py /auth/register-family`、`tests/test_accounts.py` | 员工开通限本社区、初始密码过强度策略；家属注册开放但零权限、IP 限流 10 次/小时；均入审计 |
 | 医疗信息处理合规审查 | **未完成** | `docs/SECURITY_PRIVACY.md` | 不能由代码自动代替 |
-| 测试 | **57 项已通过** | `backend/tests`（test_api 35 + test_security 19 + test_ops 3） | `pytest -q`，覆盖 API 回归+安全边界+生产配置+迁移 |
+| 测试 | **62 项已通过** | `backend/tests`（test_api 35 + test_security 19 + test_ops 3 + test_accounts 5） | `pytest -q`，覆盖 API 回归+安全边界+生产配置+迁移+账号开通 |
 
 ## 不得暗示已经完成的事情
 

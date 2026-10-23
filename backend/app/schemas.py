@@ -27,6 +27,18 @@ class WxLoginIn(Model):
     code: str = Field(min_length=5, max_length=512)
 
 
+class RegisterFamilyIn(Model):
+    username: str = Field(min_length=4, max_length=40)
+    display_name: str = Field(min_length=2, max_length=40)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class ProvisionAccountIn(Model):
+    username: str = Field(min_length=4, max_length=40)
+    display_name: str = Field(min_length=2, max_length=40)
+    initial_password: str = Field(min_length=1, max_length=200)
+
+
 class UserOut(Model):
     id: int
     username: str

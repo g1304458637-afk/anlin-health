@@ -41,6 +41,8 @@ class SlidingWindowLimiter:
 login_limiter = SlidingWindowLimiter()
 wechat_limiter = SlidingWindowLimiter()
 claim_limiter = SlidingWindowLimiter()
+register_limiter = SlidingWindowLimiter()
+provision_limiter = SlidingWindowLimiter()
 
 
 def client_ip(request) -> str:

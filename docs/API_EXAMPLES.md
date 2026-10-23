@@ -32,7 +32,9 @@ curl -X POST http://127.0.0.1:8000/api/auth/dev-login \
 | POST | `/api/auth/logout-all` | 全端登出 |
 | POST | `/api/auth/mfa/totp` | 开通 TOTP，secret 仅显示一次 |
 | DELETE | `/api/auth/mfa/totp` | 关闭 TOTP 并轮换会话 |
-| GET | `/api/auth/demo-status` | 控制台用：是否显示演示登录提示 |
+| GET | `/api/auth/demo-status` | 控制台/门户用：是否显示演示登录提示 |
+| 居民 | POST | `/api/community/accounts` | 工作人员为本社区老人开通账号（员工令牌） |
+| 家属 | POST | `/api/auth/register-family` | 家属自助注册（开放、零权限，需居民邀请码授权后才有数据） |
 
 ## 2. 对象与流程索引
 
