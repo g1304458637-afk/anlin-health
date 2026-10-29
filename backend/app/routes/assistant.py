@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..assistant_knowledge import TOPICS, search_topics
+from ..assistant_knowledge import search_topics
 from ..config import settings
 from ..db import get_db
 from ..deps import auth_user, audit

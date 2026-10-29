@@ -43,7 +43,7 @@ def process(name: str, page_js: list[str]) -> None:
 
     scripts = re.findall(r"<script>([\s\S]*?)</script>", html)
     assert len(scripts) == len(page_js), f"{name}: expected {len(page_js)} inline scripts, found {len(scripts)}"
-    js = ("\n\n".join(s for s, keep in zip(scripts, page_js) if keep)).strip() + "\n"
+    js = ("\n\n".join(s for s, keep in zip(scripts, page_js, strict=True) if keep)).strip() + "\n"
     (STATIC / "js" / f"{name}-app.js").write_text(js, encoding="utf-8")
     html = re.sub(r"[ \t]*<script>[\s\S]*?</script>\n?", "", html)
 

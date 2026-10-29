@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from ..db import get_db
-from ..models import User, Resident, Visit, AuditLog
+from ..models import User, Resident, Visit
 from ..deps import require_roles, auth_user, check_access, is_owner, audit
 from ..schemas import VisitIn, VisitOut, VisitFinish
 from ..reporting import visible_resident_ids
@@ -84,7 +84,6 @@ def admin_summary(user: User = Depends(require_roles("admin")), db: Session = De
             select(ConsentEvent.resident_id, ConsentEvent.granted, ConsentEvent.review_status)
             .where(ConsentEvent.purpose == "community_care").order_by(ConsentEvent.id)):
         latest[resident_id] = bool(granted) and review_status == "approved"
-    counts: dict[int, int] = dict(db.execute(select(Resident.community_id, func.count()).group_by(Resident.community_id)).all())
     active_counts: dict[int, int] = {}
     for resident_id, community_id in db.execute(select(Resident.id, Resident.community_id)):
         if latest.get(resident_id):

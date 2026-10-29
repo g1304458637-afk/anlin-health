@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, date
 from sqlalchemy import String, Integer, Boolean, DateTime, Date, ForeignKey, JSON, Text, Float, Index, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 from .crypto import EncryptedString
 from .db import Base
 

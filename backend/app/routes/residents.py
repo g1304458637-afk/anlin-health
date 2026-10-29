@@ -2,13 +2,12 @@ from datetime import datetime, timezone
 import re
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, update
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from ..db import get_db
-from ..config import settings
 from ..models import User, Resident, Community, ConsentEvent, ClaimRequest
 from ..deps import auth_user, require_roles, check_access, is_owner, is_staff_for, consent_active, audit
-from ..ratelimit import claim_limiter, provision_limiter, client_ip
+from ..ratelimit import claim_limiter, provision_limiter
 from ..security import validate_password_strength, hash_password, new_invite_code
 from ..reporting import visible_resident_ids
 from ..schemas import (ResidentOut, SelfResidentIn, AssistedResidentIn, ResidentPatch, ConsentIn, ConsentOut,

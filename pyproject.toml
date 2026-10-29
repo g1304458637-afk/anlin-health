@@ -1,0 +1,11 @@
+[tool.ruff]
+line-length = 200
+target-version = "py312"
+extend-exclude = ["miniapp", "docs"]
+
+[tool.ruff.lint]
+# F = pyflakes (real bugs), E9 = runtime errors, B = bugbear.
+# The compact one-line house style deliberately omits E7xx/E501 style rules.
+select = ["F", "E9", "B"]
+# E402: app modules deliberately import models after Base setup in a few places.
+ignore = ["E402", "B008", "B904"]

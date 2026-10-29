@@ -4,7 +4,6 @@ Every replacement asserts exactly one hit so a drifted source fails loudly.
 Also swaps native prompt()/confirm() for the shared dialog and routes both
 pages' duplicated api()/esc()/toast helpers through static/js/app-core.js.
 """
-import re
 from pathlib import Path
 
 STATIC = Path(__file__).resolve().parents[1] / "static"

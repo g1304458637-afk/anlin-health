@@ -15,9 +15,19 @@ jobs:
           node-version: '22'
       - name: Install backend dependencies
         run: pip install -r backend/requirements-dev.txt
+      - name: Lint backend
+        run: ruff check backend/app backend/scripts backend/migrations
       - name: Test backend
         working-directory: backend
         run: python -m pytest -q
+      - name: Verify Alembic migrations upgrade and downgrade cleanly
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ci_migrations.db
+        run: |
+          python -m alembic upgrade head
+          python -m alembic downgrade 6b3a2d87c4e1
+          python -m alembic upgrade head
       - name: Check embedded web JavaScript
         run: python backend/scripts/check_web_syntax.py
       - name: Test web session and workflow regressions
@@ -33,3 +43,9 @@ jobs:
           for f in files: json.loads(f.read_text('utf-8'))
           print('Valid JSON:',len(files))
           PY
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the demo image
+        run: docker build -f ops/Dockerfile -t anlin-health:ci .

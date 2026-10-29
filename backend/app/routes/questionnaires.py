@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from ..db import get_db
 from ..models import User, Resident, Questionnaire, QuestionnaireResponse
-from ..deps import auth_user, check_access, is_owner, is_staff_for, audit
+from ..deps import auth_user, check_access, is_owner, audit
 from ..schemas import QuestionnaireOut, AnswersIn, ResponseOut
 
 router = APIRouter(prefix="/api", tags=["questionnaires"])
