@@ -20,7 +20,7 @@ from ..ratelimit import SlidingWindowLimiter
 from ..reporting import visible_resident_ids
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
-limiter = SlidingWindowLimiter()
+limiter = SlidingWindowLimiter("assistant-chat")
 
 
 class HistoryItem(BaseModel):

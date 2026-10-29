@@ -1,15 +1,18 @@
+import hashlib
 import re
-import time
+import random
 from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from ..db import get_db
 from ..config import settings
-from ..models import User, Resident, ClaimRequest
+from ..models import User, Resident, ClaimRequest, SingleUseToken
 from ..ratelimit import login_limiter, wechat_limiter, register_limiter, client_ip
 from ..security import verify_password, validate_password_strength, hash_password, access_token, new_invite_code
 from ..deps import auth_user, audit
@@ -32,20 +35,27 @@ def _timing_equalizer_hash() -> str:
         _dummy_hash = hash_password("timing-equalizer-占位-Abcdef9527")
     return _dummy_hash
 
-# One-time WeChat codes: a replayed code is rejected without contacting WeChat again.
-_used_wx_codes: dict[str, float] = {}
-_WX_CODE_TTL_SECONDS = 300.0
 
+def _consume_wx_code(db: Session, code: str) -> bool:
+    """Mark a WeChat code redeemed; return False when it was already used.
 
-def _consume_wx_code(code: str) -> bool:
-    """Return False if this exact code was already redeemed recently."""
-    now = time.monotonic()
-    for k, ts in list(_used_wx_codes.items()):
-        if now - ts > _WX_CODE_TTL_SECONDS:
-            _used_wx_codes.pop(k, None)
-    if code in _used_wx_codes:
+    Stored as a hash in `single_use_tokens`, so replay protection holds across
+    processes (the previous per-process dict silently allowed replays when more
+    than one worker was running). Codes are single-use on WeChat's side as well,
+    so rows only need to outlive a short replay window.
+    """
+    token_hash = hashlib.sha256(code.encode()).hexdigest()
+    db.add(SingleUseToken(kind="wx_code", token_hash=token_hash))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
         return False
-    _used_wx_codes[code] = now
+    if random.random() < 0.05:
+        db.execute(delete(SingleUseToken).where(
+            SingleUseToken.kind == "wx_code",
+            SingleUseToken.created_at < datetime.now(timezone.utc) - timedelta(days=1)))
+        db.commit()
     return True
 
 
@@ -279,7 +289,7 @@ async def exchange_wechat_code(code: str) -> str:
 async def wechat_login(body: WxLoginIn, request: Request, db: Session = Depends(get_db)):
     if not wechat_limiter.hit(client_ip(request), settings.wechat_login_rate_per_minute):
         raise HTTPException(429, "尝试过于频繁，请稍后再试")
-    if not _consume_wx_code(body.code):
+    if not _consume_wx_code(db, body.code):
         raise HTTPException(401, "微信登录凭据无效，请重新登录")
     openid = await exchange_wechat_code(body.code)
     user = db.scalar(select(User).where(User.wechat_openid == openid))

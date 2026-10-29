@@ -14,7 +14,7 @@ from ..schemas import AdminUserOut, CreateStaffIn
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-\u4e00-\u9fa5]{4,40}$")
-create_staff_limiter = SlidingWindowLimiter()
+create_staff_limiter = SlidingWindowLimiter("admin-create-staff")
 
 
 def _user_out(u: User) -> AdminUserOut:

@@ -29,8 +29,8 @@ _MAX_BYTES = 10 * 1024 * 1024
 _MAX_REPORTS_PER_RESIDENT = 200
 _MIMES = {"application/pdf", "image/png", "image/jpeg", "image/webp"}
 _NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
-_extract_limiter = SlidingWindowLimiter()
-_upload_limiter = SlidingWindowLimiter()
+_extract_limiter = SlidingWindowLimiter("report-extract")
+_upload_limiter = SlidingWindowLimiter("report-upload")
 
 
 def _accessible(db: Session, user: User, report_id: int, *, write: bool = False) -> tuple[MedicalReport, Resident]:

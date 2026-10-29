@@ -20,7 +20,7 @@ from ..report_processing import provider_base
 from .reports import _accessible, _verified_data
 
 router = APIRouter(prefix="/api/assistant", tags=["private report assistant"])
-limiter = SlidingWindowLimiter()
+limiter = SlidingWindowLimiter("report-assistant")
 _NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 
 

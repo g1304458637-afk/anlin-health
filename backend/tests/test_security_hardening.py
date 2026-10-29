@@ -100,3 +100,26 @@ def test_unknown_username_and_wrong_password_behave_identically(client):
     wrong = client.post("/api/auth/login", json={"username": "resident", "password": "DefinitelyWrong123!"})
     assert unknown.status_code == wrong.status_code == 401
     assert unknown.json() == wrong.json()
+
+
+def test_rate_limit_windows_survive_worker_restart_shapes(client, db):
+    """Two independent limiter objects (as separate workers would build) must share
+    one window — the previous in-process deques silently multiplied limits by workers."""
+    from app.models import RateEvent
+    from app.ratelimit import SlidingWindowLimiter
+    worker_a, worker_b = SlidingWindowLimiter("test-shared"), SlidingWindowLimiter("test-shared")
+    assert worker_a.hit("key-1", 2, 60)
+    assert worker_b.hit("key-1", 2, 60)
+    assert not worker_a.hit("key-1", 2, 60)
+    assert db.query(RateEvent).count() == 2
+    assert not any(row.key_hash.startswith("key-") for row in db.query(RateEvent).all())  # keys stored hashed
+
+
+def test_wechat_code_replay_rejected_before_provider_contact(client):
+    code = "replay-test-code-0123456789abcdef"
+    first = client.post("/api/auth/wechat", json={"code": code})
+    assert first.status_code == 503  # no provider credentials configured in tests
+    replay = client.post("/api/auth/wechat", json={"code": code})
+    assert replay.status_code == 401
+    fresh = client.post("/api/auth/wechat", json={"code": code + "x"})
+    assert fresh.status_code == 503  # a different code still reaches the provider path

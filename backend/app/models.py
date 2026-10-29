@@ -177,6 +177,30 @@ class AuditLog(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class RateEvent(Base):
+    """Sliding-window hit for app.ratelimit; keys are SHA-256 hashes, never raw IPs."""
+    __tablename__ = "rate_events"
+    __table_args__ = (Index("ix_rate_window", "bucket", "key_hash", "at"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    bucket: Mapped[str] = mapped_column(String(64))
+    key_hash: Mapped[str] = mapped_column(String(64))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SingleUseToken(Base):
+    """Server-side one-time tokens (e.g. WeChat login codes), stored hashed.
+
+    Replacing the per-process dict keeps replay protection intact when the app
+    runs more than one worker.
+    """
+    __tablename__ = "single_use_tokens"
+    __table_args__ = (Index("ix_single_use_kind_created", "kind", "created_at"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 Index("ix_family_active", FamilyGrant.resident_id, FamilyGrant.grantee_id)
 
 # Register private report tables for create_all and Alembic metadata discovery.
