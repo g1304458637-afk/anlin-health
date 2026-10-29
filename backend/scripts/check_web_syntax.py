@@ -41,7 +41,7 @@ def main():
             if result.returncode:
                 raise SystemExit(f"{name} inline script {index}: {result.stderr}")
             total += 1
-    for source in static.glob("*.js"):
+    for source in sorted(static.glob("*.js")) + sorted((static / "js").glob("*.js")):
         subprocess.run(["node", "--check", str(source)], check=True)
     print(f"Checked {total} inline JavaScript blocks and standalone scripts")
 

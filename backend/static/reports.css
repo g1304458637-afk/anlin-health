@@ -102,3 +102,4 @@
 .ar-history-item .ar-note{margin:6px 0}
 .ar-message .ar-button{margin-left:12px;min-height:34px}
 @media(max-width:680px){.ar-empty-detail{padding:30px 0}.ar-filter-dates{grid-template-columns:1fr 1fr}.ar-history{padding:14px}.ar-source.ar-zoomed .ar-page-image{min-width:1000px}}
+.ar-button.ar-danger{color:#C2453A;border-color:#F3D9D6}

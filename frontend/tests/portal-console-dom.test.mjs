@@ -5,7 +5,14 @@ import vm from 'node:vm';
 import test from 'node:test';
 
 const root = resolve(import.meta.dirname, '../..');
-const scripts = name => [...readFileSync(resolve(root, `backend/static/${name}.html`), 'utf8').matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m => m[1]).filter(Boolean);
+const scripts = name => {
+  // Page scripts are external files now (CSP script-src 'self'); load them in
+  // the same order the browser would: app-core first, then the page bundle.
+  const read = rel => readFileSync(resolve(root, rel), 'utf8');
+  const inline = [...readFileSync(resolve(root, `backend/static/${name}.html`), 'utf8')
+    .matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m => m[1]).filter(Boolean);
+  return [...inline, read('backend/static/js/app-core.js'), read(`backend/static/js/${name}-app.js`)];
+};
 
 function harness(name, route, initialStorage = {}) {
   const elements = new Map(), requests = [], events = [];
@@ -23,8 +30,8 @@ function harness(name, route, initialStorage = {}) {
   };
   const storage = new Map(Object.entries(initialStorage));
   const context = vm.createContext({
-    console, setTimeout, clearTimeout, AbortSignal, Date, Promise,
-    document: {getElementById: element, querySelectorAll: () => [], querySelector: () => null},
+    console, setTimeout, clearTimeout, AbortSignal, Date, Promise, Element: class {},
+    document: {getElementById: element, querySelectorAll: () => [], querySelector: () => null, addEventListener: () => {}},
     sessionStorage: {getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k)},
     CustomEvent: class { constructor(type) { this.type = type; } },
     navigator: {}, confirm: () => true, prompt: () => null,
@@ -39,7 +46,7 @@ function harness(name, route, initialStorage = {}) {
   context.addEventListener = () => {};
   context.scrollTo = () => {};
   context.location = {href: ''};
-  for (const script of scripts(name).slice(0, name === 'console' ? 2 : 1)) vm.runInContext(script, context, {filename: name});
+  for (const script of scripts(name)) vm.runInContext(script, context, {filename: name});
   return {context, element, requests, events, run: code => vm.runInContext(code, context)};
 }
 
@@ -65,7 +72,7 @@ test('family invite is shown to family and claim submission stays generic', asyn
   h.element('luser').value = 'family'; h.element('lpwd').value = 'password';
   await h.element('loginBtn').onclick();
   await h.context.renderFamilyList();
-  assert.match(h.element('famList').innerHTML, /declineGrant\(7,9\)/);
+  assert.match(h.element('famList').innerHTML, /data-act="decline-grant" data-rid="7" data-gid="9"/);
   await h.context.declineGrant(7, 9);
   assert.equal(grantActive, false);
   h.context.tab('v-me');
@@ -165,7 +172,7 @@ test('console uses aggregate stats and clears role specific data on logout', asy
   assert.equal(h.requests.filter(r => r.url.includes('/vitals')).length, 0);
   await h.context.loadConsentReviews();
   assert.match(h.element('consentQueue').innerHTML, /需其他工作人员复核/);
-  assert.doesNotMatch(h.element('consentQueue').innerHTML, /reviewConsentEvent\(10/);
+  assert.doesNotMatch(h.element('consentQueue').innerHTML, /data-id="10"[^>]*data-approve="true"/);
   h.context.showProvision();
   assert.match(h.element('modalFields').innerHTML, /initial_password/);
   h.element('mfaPassword').value = 'current-password';
@@ -293,8 +300,8 @@ test('admin can create fixed staff accounts and manage only nonadmin users', asy
   h.context.switchView('settings');
   await h.context.loadAdminAccounts();
   assert.equal(h.element('adminAccountsPanel').classList.contains('hidden'), false);
-  assert.match(h.element('adminAccountRows').innerHTML, /toggleAdminAccount\(2,false\)/);
-  assert.doesNotMatch(h.element('adminAccountRows').innerHTML, /toggleAdminAccount\(1/);
+  assert.match(h.element('adminAccountRows').innerHTML, /data-act="toggle-admin-account" data-id="2" data-activate="false"/);
+  assert.doesNotMatch(h.element('adminAccountRows').innerHTML, /data-id="1"/);
   Object.assign(h.element('adminUsername'), {value: 'staff_b'});
   Object.assign(h.element('adminDisplayName'), {value: '员工乙'});
   Object.assign(h.element('adminCommunity'), {value: '4'});

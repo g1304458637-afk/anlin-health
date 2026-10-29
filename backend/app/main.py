@@ -51,12 +51,15 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
-    # console.html ships inline script/handlers; if you extract them to files, drop 'unsafe-inline'.
+    # Page scripts live in external static files and every handler is bound via
+    # data-act delegation, so script-src can be strict. style-src keeps
+    # 'unsafe-inline' for style="" attributes in generated templates — attribute
+    # styles are low-risk and removing them is cosmetic churn, not a win.
     assets = " ".join(settings.csp_asset_origins)
     img_src = f"'self' data: blob:{' ' + assets if assets else ''}"
     media_src = f"'self'{(' ' + assets) if assets else ''}"
     response.headers.setdefault("Content-Security-Policy",
-                                f"default-src 'self'; img-src {img_src}; media-src {media_src}; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'")
+                                f"default-src 'self'; img-src {img_src}; media-src {media_src}; style-src 'self' 'unsafe-inline'; script-src 'self'")
     if settings.app_env == "production":
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         response.headers.setdefault("Cache-Control", "no-store")

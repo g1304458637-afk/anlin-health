@@ -1,0 +1,433 @@
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+let token=sessionStorage.getItem('token')||'', me=null, resident=null, communities=[], quizState=null, vtType='blood_pressure', vitalOffset=0;
+let sessionVersion=0, trendDays=30, trendRequestSeq=0, vitalRequestSeq=0, pendingVital=null;
+window.anlinAssistantAuth=()=>({token,user:me});
+function sessionChanged(){sessionVersion++;trendRequestSeq++;vitalRequestSeq++;pendingVital=null;window.AnlinPlans?.reset();window.dispatchEvent(new CustomEvent('anlin-session-change'))}
+
+const toast=window.AnlinCore.makeToast(()=>$('toast'),2600);
+const api=window.AnlinCore.createApi({getToken:()=>token,getVersion:()=>sessionVersion,onAuthExpired:logout,
+  describeError:d=>typeof d==='string'?d:Array.isArray(d)?d.map(x=>x.msg).join('；'):'操作失败'});
+const {esc,fmtTime,fmtD,localDay,localDate,localInputDate}=window.AnlinCore;
+
+function icon(name){const paths={home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/><path d="M9 21v-8h6v8"/>',heart:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/><path d="M3 12h4l2-4 4 8 2-4h6"/>',calendar:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18m-13 5 3 2 5-4"/>',file:'<path d="M14 2H5a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9Z"/><path d="M14 2v7h7M7 13h10M7 17h7"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',users:'<circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M17 4a4 4 0 0 1 0 8m3 9v-2a7 7 0 0 0-3-6"/>'};return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.heart}</svg>`}
+async function loadHomeLatest(){
+  const version=sessionVersion;if(!resident)return;
+  try{const lists=await Promise.all(Object.keys(VT).map(metric=>api(`/api/residents/${resident.id}/vitals?limit=1&metric=${metric}`)));if(version!==sessionVersion)return;
+    $('homeLatest').innerHTML=Object.keys(VT).map((metric,i)=>{const p=lists[i][0],value=p?(metric==='blood_pressure'?`${p.systolic} / ${p.diastolic}`:metric==='blood_glucose'?p.glucose_mmol_l:p.weight_kg):'—';return `<div class="kv"><span>${VT[metric].label}</span><b>${esc(value)} <small style="font-size:11px;font-weight:400;color:var(--muted)">${VT[metric].unit}</small></b></div>`}).join('');
+  }catch(e){if(version===sessionVersion)$('homeLatest').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+
+/* ---------- 登录 ---------- */
+async function doLogin(){
+  const u=$('luser').value.trim(),p=$('lpwd').value;
+  if(!u||!p)return toast('请输入账号和密码');
+  const btn=$('loginBtn');if(btn.disabled)return;btn.disabled=true;
+  try{await submitLogin('/api/auth/login',{username:u,password:p})}catch(e){toast(e.message)}finally{btn.disabled=false}
+}
+async function submitLogin(path,payload){
+  const res=await fetch(path,{method:'POST',signal:AbortSignal.timeout(15000),headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(res.status===401&&res.headers.get('X-MFA-Required')==='totp'){
+    const code=await window.AnlinCore.promptDialog('此账号已开启两步验证，请输入认证器中的6位验证码：');
+    if(!code)return;
+    return submitLogin('/api/auth/login/totp',{...payload,totp_code:code.trim()});
+  }
+  const body=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(typeof body.detail==='string'?body.detail:'登录失败');
+  token=body.access_token;sessionStorage.setItem('token',token);me=body.user;sessionChanged();
+  await enterApp();
+}
+async function registerFamily(){
+  const b={username:$('ruser').value.trim(),display_name:$('rname').value.trim(),password:$('rpwd').value};
+  if(!b.username||!b.display_name||!b.password)return toast('请填写完整');
+  const btn=$('regBtn');if(btn.disabled)return;btn.disabled=true;
+  try{await submitLogin('/api/auth/register-family',b);toast('注册成功，欢迎使用')}catch(e){toast(e.message)}finally{btn.disabled=false}
+}
+function showLogin(){
+  $('loginView').classList.remove('hidden');$('appView').classList.add('hidden');
+  me=null;resident=null;communities=[];quizState=null;vtType='blood_pressure';vitalOffset=0;trendDays=30;pendingVital=null;
+  for(const id of ['whoami','tabbar','obComm','homeArchive','homeReminders','homeLatest','healthPlans','vitalSaveState','vtTabs','vtFields','vtTrend','vtList','vtPaging','quizList','quizForm','quizMine','remList','meProfile','meShare','famList','famDetail','claimStatus','consentState','consentHistory'])$(id).replaceChildren();
+  for(const id of ['luser','lpwd','ruser','rname','rpwd','pwCur','pwNew','gCode','claimId','claimName','claimPhone','claimNote','obName','obYear','remTitle','remDate','vtMeasuredAt']){const el=$(id);if(el)el.value=''}
+  $('obConsent').checked=false;$('regBox').classList.add('hidden');$('claimCard').classList.add('hidden');$('consentCard').classList.add('hidden');
+  $('quizForm').classList.add('hidden');$('quizList').classList.remove('hidden');$('famDetail').classList.add('hidden');$('famList').classList.remove('hidden');
+  $('toast').textContent='';$('toast').classList.add('hidden');
+  document.querySelectorAll('main .view').forEach(x=>x.classList.remove('on'));
+}
+function logout(){sessionStorage.removeItem('token');token='';showLogin();sessionChanged()}
+
+/* ---------- 启动 ---------- */
+async function enterApp(){
+  if(!me||!['resident','family'].includes(me.role)){logout();$('demoHint').innerHTML='工作人员或管理员请使用 <a href="/console">社区工作台</a> 登录。';return}
+  const version=sessionVersion;
+  $('loginView').classList.add('hidden');$('appView').classList.remove('hidden');
+  $('whoami').textContent=(me.display_name||me.username)+' · '+(me.role==='family'?'家属':'居民');
+  try{
+    if(me.role==='family'){buildTabs([['v-family','家人','👥'],['v-me','我的','🙂']]);renderFamilyList()}
+    else{buildTabs([['v-home','首页','🏠'],['v-vitals','健康','❤️'],['v-quiz','问卷','📋'],['v-remind','提醒','⏰'],['v-me','我的','🙂']])}
+    if(me.role!=='family'){
+      const loadedCommunities=await api('/api/communities');if(version!==sessionVersion)return;communities=loadedCommunities;
+      $('obComm').innerHTML=communities.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+      try{const loadedResident=await api('/api/residents/me');if(version!==sessionVersion)return;resident=loadedResident}catch(e){if(e.message==='会话已切换')return;resident=null}
+      renderHome();renderVitals();
+    }
+    tab(me.role==='family'?'v-family':'v-home');
+  }catch(e){toast(e.message)}
+}
+function buildTabs(tabs){
+  $('tabbar').innerHTML=tabs.map(t=>`<button data-v="${t[0]}" data-act="tab"><span class="ico">${icon({'v-home':'home','v-vitals':'heart','v-quiz':'file','v-remind':'calendar','v-me':'user','v-family':'users'}[t[0]])}</span>${t[0]==='v-remind'?'计划':t[1]}</button>`).join('');
+}
+function tab(v){
+  if(!me)return;
+  document.querySelectorAll('main .view').forEach(x=>x.classList.remove('on'));
+  const el=$(v);if(el)el.classList.add('on');
+  document.querySelectorAll('#tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  if(v==='v-quiz')renderQuiz();
+  if(v==='v-remind'){renderReminders();if(resident&&me.role==='resident')window.AnlinPlans?.mount($('healthPlans'),{residentId:resident.id,request:api,notify:toast})}
+  if(v==='v-me')renderMe();
+  if(v==='v-home')renderHome();
+  if(v==='v-vitals')renderVitals();
+}
+
+/* ---------- 首页 ---------- */
+async function renderHome(){
+  if(me.role==='family')return;
+  const version=sessionVersion;
+  const has=!!resident;
+  $('onboardBox').classList.toggle('hidden',has);
+  $('homeBox').classList.toggle('hidden',!has);
+  if(!has)return;
+  const comm=(communities.find(c=>c.id===resident.community_id)||{}).name||('社区 #'+resident.community_id);
+  $('homeDate').textContent=new Date().toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'long'});
+  $('homeArchive').innerHTML=`<div><div class="page-kicker">一份属于您的健康档案</div><h2>${esc(resident.name)}，您好</h2><p>${esc(comm)} · ${esc(resident.birth_year)} 年出生<br>今天，从关心自己的一件小事开始。</p><span class="tag">${resident.consent_active?'社区关怀已连接':'社区服务授权未生效'}</span></div><img src="/static/care-garden.svg" alt="">`;
+  loadHomeLatest();
+  try{
+    const [rems,planTasks]=await Promise.all([api(`/api/residents/${resident.id}/reminders?pending_only=true&limit=100`),window.AnlinPlans?api(`/api/residents/${resident.id}/plan-occurrences?days=1&status=pending&limit=100`).catch(()=>null):Promise.resolve(null)]);
+    if(version!==sessionVersion)return;
+    const today=localDate();
+    const planned=(planTasks?.items||[]).map(t=>({id:t.id,title:t.title,due_date:localDay(new Date(t.due_at)),plan:true}));
+    const due=[...rems,...planned].filter(r=>!r.completed_at&&fmtD(r.due_date)<=today).sort((a,b)=>a.due_date.localeCompare(b.due_date)).slice(0,4);
+    $('homeReminders').innerHTML=due.length?due.map(r=>`<div class="item"><span class="tag-grey tag">${fmtD(r.due_date)<today?'逾期 '+fmtD(r.due_date).slice(5):'今天'}</span><div class="grow"><b>${esc(r.title)}</b></div></div>`).join(''):'<div class="empty">今天的安排很从容<br><small>可以去计划页安排下一次记录。</small></div>';
+  }catch(e){if(!me)return;$('homeReminders').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+
+/* ---------- 健康 ---------- */
+const VT={blood_pressure:{label:'血压',unit:'mmHg'},blood_glucose:{label:'血糖',unit:'mmol/L'},weight:{label:'体重',unit:'kg'}};
+function renderVitals(){
+  if(me?.role==='family'||!resident)return;
+  $('vtFormTitle').textContent='记录'+VT[vtType].label;
+  $('vtTabs').innerHTML=Object.keys(VT).map(k=>`<button class="pill ${k===vtType?'on':''}" data-act="set-vt" data-metric="${k}">${VT[k].label} <span class="helper" style="margin:0;font-size:11px;color:inherit">${VT[k].unit}</span></button>`).join('');
+  const f=$('vtFields');
+  if(vtType==='blood_pressure')f.innerHTML=`<div class="field"><label for="vSys">收缩压（高压）</label><input id="vSys" type="number" inputmode="numeric" min="40" max="300" placeholder="例如 120"></div><div class="field"><label for="vDia">舒张压（低压）</label><input id="vDia" type="number" inputmode="numeric" min="20" max="200" placeholder="例如 80"></div>`;
+  else if(vtType==='blood_glucose')f.innerHTML=`<div class="field"><label for="vGlu">血糖值（mmol/L）</label><input id="vGlu" type="number" step="0.1" min="0.5" max="50" placeholder="例如 5.6"></div><div class="field"><label for="vContext">进餐相关说明</label><select id="vContext"><option value="unknown">不确定 / 未记录</option><option value="fasting">空腹</option><option value="before_meal">餐前</option><option value="after_meal">餐后</option></select></div>`;
+  else f.innerHTML=`<div class="field"><label for="vWt">体重（kg）</label><input id="vWt" type="number" step="0.1" min="5" max="400" placeholder="例如 62.5"></div>`;
+  $('vtMeasuredAt').value=localInputDate(new Date());
+  $('vitalSaveState').textContent='';pendingVital=null;
+  loadVitals();loadTrend();
+}
+async function setVT(k){vtType=k;vitalOffset=0;renderVitals()}
+function pageVitals(step){vitalOffset=Math.max(0,vitalOffset+step*20);loadVitals()}
+async function loadVitals(){
+  const version=sessionVersion,metric=vtType,seq=++vitalRequestSeq;
+  try{
+    const list=await api(`/api/residents/${resident.id}/vitals?limit=20&offset=${vitalOffset}&metric=${metric}`);
+    if(version!==sessionVersion||metric!==vtType||seq!==vitalRequestSeq)return;
+    const contexts={fasting:'空腹',before_meal:'餐前',after_meal:'餐后',unknown:'进餐情况未注明'};
+    $('vtList').innerHTML=list.length?list.map(v=>{
+      const val=metric==='blood_pressure'?`${v.systolic} / ${v.diastolic} ${VT[metric].unit}`:`${metric==='blood_glucose'?v.glucose_mmol_l:v.weight_kg} ${VT[metric].unit}`;
+      return `<div class="item"><div class="grow"><b class="history-value">${esc(val)}</b>${contexts[v.measurement_context]?`<span class="context-label">${contexts[v.measurement_context]}</span>`:''}<div class="d">${esc(fmtTime(v.measured_at))}</div></div><button class="btn btn-line btn-danger" style="height:38px;padding:0 14px;font-size:12px" data-act="del-vital" data-id="${v.id}">删除</button></div>`;
+    }).join(''):'<div class="empty">还没有记录，从今天的第一次测量开始。</div>';
+    $('vtPaging').innerHTML=`<button class="btn btn-line" ${vitalOffset?'':'disabled'} data-act="page-vitals" data-step="-1">上一页</button><span class="helper" style="margin:0">第 ${Math.floor(vitalOffset/20)+1} 页</span><button class="btn btn-line" ${list.length===20?'':'disabled'} data-act="page-vitals" data-step="1">下一页</button>`;
+  }catch(e){if(version!==sessionVersion||seq!==vitalRequestSeq)return;$('vtList').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+function setTrendRange(days){trendDays=days;document.querySelectorAll('#trendRanges button').forEach(b=>b.classList.toggle('on',Number(b.dataset.days)===days));loadTrend()}
+async function loadTrend(){
+  if(!resident||!window.AnlinTrend)return;
+  const seq=++trendRequestSeq,version=sessionVersion,metric=vtType;
+  const end=new Date(),start=new Date();start.setDate(end.getDate()-trendDays+1);
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Shanghai';
+  $('vtTrend').innerHTML='<div class="chart-empty">正在整理这段时间的记录…</div>';
+  try{
+    const data=await api(`/api/residents/${resident.id}/vitals/series?metric=${metric}&start_date=${localDay(start)}&end_date=${localDay(end)}&tz=${encodeURIComponent(tz)}`);
+    if(seq!==trendRequestSeq||version!==sessionVersion||metric!==vtType)return;
+    window.AnlinTrend.render($('vtTrend'),data);
+  }catch(e){if(seq===trendRequestSeq&&version===sessionVersion)$('vtTrend').innerHTML='<div class="chart-empty">'+esc(e.message)+'</div>'}
+}
+async function saveVital(){
+  let payload={type:vtType};
+  if(vtType==='blood_pressure'){
+    const s=+($('vSys').value),d=+($('vDia').value);
+    if(!s||!d)return toast('请填写收缩压和舒张压');payload.systolic=s;payload.diastolic=d;
+  }else if(vtType==='blood_glucose'){
+    const g=+($('vGlu').value);if(!g)return toast('请填写血糖值');payload.glucose_mmol_l=g;payload.measurement_context=$('vContext').value||'unknown';
+  }else{const w=+($('vWt').value);if(!w)return toast('请填写体重');payload.weight_kg=w}
+  const when=new Date($('vtMeasuredAt').value);
+  if(Number.isNaN(when.getTime()))return toast('请填写实际测量时间');payload.measured_at=when.toISOString();
+  const fingerprint=JSON.stringify(payload);
+  if(!pendingVital||pendingVital.fingerprint!==fingerprint)pendingVital={fingerprint,id:window.crypto?.randomUUID?.()||('vital_'+Date.now()+'_'+Math.random().toString(36).slice(2))};
+  payload.client_request_id=pendingVital.id;
+  const version=sessionVersion,btn=$('vtSave');if(btn.disabled)return;btn.disabled=true;$('vitalSaveState').textContent='正在保存…';
+  try{await api(`/api/residents/${resident.id}/vitals`,'POST',payload);if(version!==sessionVersion)return;pendingVital=null;vitalOffset=0;toast('这次测量已保存');renderVitals();$('vitalSaveState').textContent='已保存，可在趋势与历史记录中查看。'}catch(e){if(version!==sessionVersion)return;$('vitalSaveState').textContent='保存未确认，内容已保留。可以再次点击保存，重复重试不会新增同一条记录。';toast(e.message)}finally{btn.disabled=false}
+}
+async function delVital(id){
+  if(!(await window.AnlinCore.confirmDialog('删除这条记录？删除后无法找回。')))return;
+  try{await api(`/api/residents/${resident.id}/vitals/${id}`,'DELETE');toast('已删除');loadVitals();loadTrend()}catch(e){toast(e.message)}
+}
+
+/* ---------- 问卷 ---------- */
+async function renderQuiz(){
+  if(me.role==='family'||!resident)return;
+  const version=sessionVersion;
+  try{
+    const qs=await api('/api/questionnaires');
+    if(version!==sessionVersion)return;
+    $('quizList').innerHTML=qs.map(q=>`<div class="card"><div class="row"><div><b>${esc(q.title)}</b><div class="d" style="color:var(--muted);font-size:13px;margin-top:4px">${q.questions.length} 道题 · ${q.category==='wellbeing'?'仅本人可见':'日常记录'}</div></div><button class="btn btn-line" data-act="open-quiz" data-id="${q.id}">去填写</button></div></div>`).join('');
+    const mine=await api(`/api/residents/${resident.id}/responses`);
+    if(version!==sessionVersion)return;
+    $('quizMine').innerHTML=mine.length?mine.slice(0,10).map(r=>`<div class="item"><div class="grow"><b>${esc((qs.find(q=>q.id===r.questionnaire_id)||{}).title||'问卷 #'+r.questionnaire_id)}</b><div class="d">${fmtD(r.created_at)} · 版本 v${r.questionnaire_version}</div></div></div>`).join(''):'<div class="empty">还没有作答记录</div>';
+  }catch(e){if(!me)return;$('quizList').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+async function openQuiz(id){
+  try{
+    const q=(await api('/api/questionnaires')).find(x=>x.id===id);
+    quizState=q;
+    $('quizList').classList.add('hidden');
+    const box=$('quizForm');box.classList.remove('hidden');
+    box.innerHTML=`<div class="card"><h3>${esc(q.title)}</h3>${q.category==='wellbeing'?'<div class="helper">此问卷仅您本人可见，家人和社区都看不到内容。</div>':''}${q.questions.map((item,i)=>`<div class="sect">${i+1}. ${esc(item.text)}</div><div class="opts">${item.options.map(o=>`<label><input type="radio" name="q_${item.id}" value="${esc(o.value)}"><span>${esc(o.label)}</span></label>`).join('')}</div>`).join('')}<button class="btn btn-primary" id="quizSubmit" type="button" style="margin-top:16px">提交问卷</button> <button class="btn btn-line" id="quizBack" type="button" style="margin-top:16px">返回</button></div>`;
+    $('quizSubmit').onclick=submitQuiz;$('quizBack').onclick=()=>{box.classList.add('hidden');$('quizList').classList.remove('hidden')};
+    window.scrollTo({top:0});
+  }catch(e){toast(e.message)}
+}
+async function submitQuiz(){
+  const answers={};
+  for(const item of quizState.questions){
+    const sel=document.querySelector(`input[name="q_${item.id}"]:checked`);
+    if(!sel)return toast('还有题目没作答哦');
+    answers[item.id]=sel.value;
+  }
+  try{
+    await api(`/api/residents/${resident.id}/responses`,'POST',{questionnaire_id:quizState.id,answers});
+    toast('提交成功，感谢您的记录');$('quizForm').classList.add('hidden');$('quizList').classList.remove('hidden');renderQuiz();
+  }catch(e){toast(e.message)}
+}
+
+/* ---------- 提醒 ---------- */
+async function renderReminders(){
+  if(me.role==='family'||!resident)return;
+  const version=sessionVersion;
+  try{
+    const list=await api(`/api/residents/${resident.id}/reminders`);
+    if(version!==sessionVersion)return;
+    $('remList').innerHTML=list.length?list.map(r=>`<div class="item"><button class="circle ${r.completed_at?'done':''}" data-act="done-remind" data-id="${r.id}" aria-label="标记完成">${r.completed_at?'✓':''}</button><div class="grow"><b style="${r.completed_at?'color:#9AA1A7;text-decoration:line-through':''}">${esc(r.title)}</b><div class="d">${fmtD(r.due_date)}${r.completed_at?' · 已完成':''}</div></div><span class="tag-grey tag">${esc({measure:'测量',questionnaire:'问卷',followup:'随访'}[r.type]||r.type)}</span></div>`).join(''):'<div class="empty">还没有提醒事项</div>';
+    if(!$('remDate').value)$('remDate').value=localDate();
+  }catch(e){if(!me)return;$('remList').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+async function doneRemind(id){
+  try{await api(`/api/residents/${resident.id}/reminders/${id}/complete`,'PATCH');renderReminders()}catch(e){toast(e.message)}
+}
+
+/* ---------- 我的 / 家人共享 ---------- */
+async function renderMe(){
+  if(me.role==='family'){
+    $('meProfile').innerHTML=`<h3>我的账号</h3><div class="kv"><span>称呼</span><b>${esc(me.display_name)}</b></div><div class="kv"><span>账号</span><b>${esc(me.username)}</b></div><div class="kv"><span>身份</span><b>家庭成员</b></div>`;
+    $('meShare').innerHTML=`<div class="card"><h3>我的家属邀请码</h3><div class="helper">把此邀请码告诉居民。居民登录自己的账号，在“我的”页面输入您的邀请码，选择可见范围和期限后授予查看权。</div><div class="mono" style="margin:12px 0">${esc(me.invite_code)}</div><div class="row" style="gap:10px"><button class="btn btn-line" style="flex:1" data-act="copy-invite">复制邀请码</button><button class="btn btn-line" style="flex:1" data-act="rotate-invite">更换邀请码</button></div></div>`;
+    $('claimCard').classList.add('hidden');$('consentCard').classList.add('hidden');
+    return;
+  }
+  if(resident){
+    const comm=(communities.find(c=>c.id===resident.community_id)||{}).name||('社区 #'+resident.community_id);
+    $('meProfile').innerHTML=`<h3>我的档案</h3><div class="kv"><span>姓名</span><b>${esc(resident.name)}</b></div><div class="kv"><span>出生年份</span><b>${resident.birth_year}</b></div><div class="kv"><span>所属社区</span><b>${esc(comm)}</b></div>
+      <div class="row" style="margin-top:12px"><button class="btn btn-line" data-act="prompt-edit">修改资料</button></div>`;
+    $('claimCard').classList.add('hidden');$('consentCard').classList.remove('hidden');
+    renderShare();renderConsent();
+  }else{
+    $('meProfile').innerHTML='<h3>还没有档案</h3><div class="empty">如社区已有您的纸质档案，请先申请认领；否则回首页建立新档案。</div>';
+    $('meShare').innerHTML='';
+    $('claimCard').classList.remove('hidden');$('consentCard').classList.add('hidden');$('claimStatus').textContent='提交后请携证件到社区现场核验；核验完成后重新登录查看档案。';
+  }
+}
+async function submitClaim(){
+  const resident_id=Number($('claimId').value),full_name=$('claimName').value.trim(),phone=$('claimPhone').value.trim(),note=$('claimNote').value.trim();
+  if(!Number.isInteger(resident_id)||resident_id<1||full_name.length<2||!phone)return toast('请填写档案编号、登记姓名和电话');
+  const btn=$('claimBtn');btn.disabled=true;
+  try{const out=await api('/api/residents/claim-requests','POST',{resident_id,full_name,phone,note:note||null});toast(out.message||'申请已提交');$('claimStatus').textContent='申请已提交。如档案信息匹配，社区工作人员会进行现场核验；请携有效证件前往社区。';$('claimId').value='';$('claimName').value='';$('claimPhone').value='';$('claimNote').value=''}
+  catch(e){toast(e.message)}finally{btn.disabled=false}
+}
+async function renderConsent(){
+  if(!resident)return;
+  const id=resident.id,version=sessionVersion;
+  try{
+    const latest=await api(`/api/residents/${id}`);if(version!==sessionVersion)return;resident=latest;
+    const history=await api(`/api/residents/${id}/consents`);
+    if(version!==sessionVersion)return;
+    $('consentState').innerHTML=`<div class="helper">当前状态：<b>${resident.consent_active?'已授权社区健康服务':'未授权社区健康服务'}</b>。撤回后社区工作人员将不能查看您的档案和测量记录。</div>`;
+    $('consentHistory').innerHTML=history.length?history.slice(0,8).map(c=>`<div class="item"><div class="grow">${c.granted?'授予':'撤回'}社区服务授权<div class="d">${esc(fmtTime(c.created_at))} · ${esc(({approved:'已生效',pending:'待复核',rejected:'已驳回'})[c.review_status]||c.review_status)}</div></div></div>`).join(''):'<div class="empty">暂无授权记录</div>';
+    $('consentBtn').textContent=resident.consent_active?'撤回社区服务授权':'重新授予社区服务授权';
+    renderHome();
+  }catch(e){if(!me)return;$('consentState').textContent=e.message}
+}
+async function toggleConsent(){
+  if(!resident)return;
+  const granted=!resident.consent_active;
+  if(!(await window.AnlinCore.confirmDialog(granted?'确认重新授权社区工作人员查看您的档案和测量数据？':'确认撤回社区服务授权？')))return;
+  const btn=$('consentBtn');btn.disabled=true;
+  try{await api(`/api/residents/${resident.id}/consents`,'POST',{granted});toast(granted?'已重新授权':'已撤回授权');await renderConsent()}
+  catch(e){toast(e.message)}finally{btn.disabled=false}
+}
+async function promptEdit(){
+  const name=await window.AnlinCore.promptDialog('姓名：',resident.name);if(name===null)return;
+  const phone=await window.AnlinCore.promptDialog('联系电话（可留空）：',resident.phone||'');
+  try{
+    resident=await api(`/api/residents/${resident.id}`,'PATCH',{name,phone:phone||null});
+    toast('已更新');renderMe();
+  }catch(e){toast(e.message)}
+}
+async function renderShare(){
+  const version=sessionVersion;
+  const box=$('meShare');
+  try{
+    const grants=await api(`/api/residents/${resident.id}/family-grants`);
+    if(version!==sessionVersion||!me)return;
+    box.innerHTML=`<div class="card"><h3>授权家人查看</h3><div class="helper">请家属登录自己的账号，在“我的”页面找到家属邀请码并告诉您。您在此输入后，授权才会生效。</div>
+        <div class="field"><label for="gCode">家人的邀请码</label><input id="gCode" placeholder="家人在“我的”页面可以看到"></div>
+        <label class="check"><input type="checkbox" id="gProfile" checked><span>允许查看基本档案（姓名、年龄）</span></label>
+        <label class="check"><input type="checkbox" id="gVitals" checked><span>允许查看测量数据（血压/血糖/体重）</span></label>
+        <div class="field"><label for="gDays">有效天数</label><input id="gDays" type="number" value="30" min="1" max="365"></div>
+        <button class="btn btn-primary" id="gBtn" type="button">授予查看权</button>
+      </div>
+      <div class="card"><h3>已授权的家人</h3>${grants.length?grants.map(g=>`<div class="item"><div class="grow"><b>${esc(g.grantee_name)}</b><div class="d">${g.can_profile?'可看档案 ':''}${g.can_vitals?'可看测量 ':''}· 到期 ${fmtD(g.expires_at)}${g.revoked_at?' · 已撤回':''}</div></div>${g.revoked_at?'':'<button class="btn btn-line btn-danger" style="height:38px;padding:0 14px;font-size:13.5px" data-act="revoke-grant" data-id="'+g.id+'">撤回</button>'}</div>`).join(''):'<div class="empty">还没有授权过家人</div>'}</div>`;
+    $('gBtn').onclick=async()=>{
+      const canP=$('gProfile').checked,canV=$('gVitals').checked,days=+($('gDays').value)||30;
+      if(!canP&&!canV)return toast('至少选择一项可见范围');
+      const btn=$('gBtn');if(btn.disabled)return;btn.disabled=true;
+      try{await api(`/api/residents/${resident.id}/family-grants`,'POST',{invite_code:$('gCode').value.trim(),can_profile:canP,can_vitals:canV,expires_in_days:days});toast('已授权');renderShare()}catch(e){toast(e.message)}finally{btn.disabled=false}
+    };
+  }catch(e){if(!me)return;box.innerHTML='<div class="card"><div class="empty">'+esc(e.message)+'</div></div>'}
+}
+function copyInvite(){
+  const code=me.invite_code;
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(code).then(()=>toast('邀请码已复制'),()=>toast('邀请码：'+code));
+  else toast('邀请码：'+code);
+}
+async function rotateInvite(){
+  if(!(await window.AnlinCore.confirmDialog('更换后旧的邀请码立即失效，确定？')))return;
+  try{const r=await api('/api/me/invite-code/rotate','POST');me.invite_code=r.invite_code;toast('已更换');renderMe()}catch(e){toast(e.message)}
+}
+async function revokeGrant(id){
+  if(!(await window.AnlinCore.confirmDialog('撤回后家人立即失去查看权限，确定？')))return;
+  try{await api(`/api/residents/${resident.id}/family-grants/${id}`,'DELETE');toast('已撤回');renderShare()}catch(e){toast(e.message)}
+}
+
+/* ---------- 家属视图 ---------- */
+async function renderFamilyList(){
+  const version=sessionVersion;
+  try{
+    const list=await api('/api/family/shared-residents');
+    if(version!==sessionVersion||!me)return;
+    $('famList').innerHTML=list.length?list.map(r=>`<div class="card"><div class="row"><div><b style="font-size:18px">${esc(r.name)}</b><div class="d" style="color:var(--muted);font-size:13px;margin-top:4px">${r.can_profile?'基本档案 ':''}${r.can_vitals?'测量数据 ':''}可见</div></div><button class="btn btn-line" data-act="open-fam" data-rid="${r.resident_id}">查看</button>${r.grant_id?`<button class="btn btn-line btn-danger" data-act="decline-grant" data-rid="${r.resident_id}" data-gid="${r.grant_id}">拒绝授权</button>`:''}</div></div>`).join(''):'<div class="card"><div class="empty">还没有可以查看的家人。请将“我的”页面中的家属邀请码告诉居民，由居民登录自己的账号授予查看权。</div></div>';
+    $('famDetail').classList.add('hidden');$('famList').classList.remove('hidden');
+  }catch(e){if(!me)return;$('famList').innerHTML='<div class="card"><div class="empty">'+esc(e.message)+'</div></div>'}
+}
+async function declineGrant(residentId,grantId){
+  if(!(await window.AnlinCore.confirmDialog('拒绝这项授权后将不能再查看该居民的数据，确定？')))return;
+  try{await api(`/api/residents/${residentId}/family-grants/${grantId}/decline`,'POST');toast('已拒绝授权');renderFamilyList()}catch(e){toast(e.message)}
+}
+async function openFam(rid){
+  const version=sessionVersion;
+  try{
+    const profile=await api(`/api/residents/${rid}`).catch(()=>null);
+    const [bp,gl,wt]=await Promise.all(['blood_pressure','blood_glucose','weight'].map(metric=>api(`/api/residents/${rid}/vitals?limit=8&metric=${metric}`).catch(()=>null)));
+    const vitals=bp||gl||wt;
+    if(version!==sessionVersion)return;
+    let html=`<button class="btn btn-line" data-act="family-back" style="margin-bottom:14px">← 返回列表</button>`;
+    if(profile){
+      html+=`<div class="card"><h3>基本档案</h3><div class="kv"><span>姓名</span><b>${esc(profile.name)}</b></div><div class="kv"><span>出生年份</span><b>${profile.birth_year}</b></div></div>`;
+    }
+    if(vitals){
+
+      const sec=(title,rows,fmt)=>`<div class="card"><h3>${title}</h3>${rows?.length?rows.slice(0,8).map(v=>`<div class="item"><div class="grow"><b>${esc(fmt(v))}</b><div class="d">${esc(fmtTime(v.measured_at))}</div></div></div>`).join(''):'<div class="empty">暂无记录</div>'}</div>`;
+      html+=sec('血压 · 最近 8 条',bp,v=>`${v.systolic}/${v.diastolic} mmHg`)+sec('血糖 · 最近 8 条',gl,v=>`${v.glucose_mmol_l} mmol/L`)+sec('体重 · 最近 8 条',wt,v=>`${v.weight_kg} kg`);
+    }
+    $('famDetail').innerHTML=html;
+    $('famList').classList.add('hidden');$('famDetail').classList.remove('hidden');
+    window.scrollTo({top:0});
+  }catch(e){toast(e.message)}
+}
+
+/* ---------- 设置 ---------- */
+async function changePassword(){
+  const cur=$('pwCur').value,ne=$('pwNew').value;
+  if(!cur||!ne)return toast('请填写完整');
+  try{
+    const out=await api('/api/auth/change-password','POST',{current_password:cur,new_password:ne});
+    token=out.access_token;sessionStorage.setItem('token',token);sessionChanged();
+    $('pwCur').value='';$('pwNew').value='';toast('密码已更新，其他设备已退出');
+  }catch(e){toast(e.message)}
+}
+
+/* ---------- 绑定 ---------- */
+$('loginBtn').onclick=doLogin;
+$('lpwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+$('regToggle').onclick=()=>$('regBox').classList.toggle('hidden');
+$('regBtn').onclick=registerFamily;
+$('logoutBtn').onclick=logout;
+$('obBtn').onclick=async()=>{
+  const body={name:$('obName').value.trim(),birth_year:+($('obYear').value),sex:$('obSex').value,community_id:+($('obComm').value),consent_to_community_care:$('obConsent').checked};
+  if(!body.name||!body.birth_year)return toast('请填写姓名和出生年份');
+  if(!body.consent_to_community_care)return toast('需要勾选同意后才能建档');
+  try{resident=await api('/api/residents/me','POST',body);toast('档案建立成功');renderHome();renderVitals()}catch(e){toast(e.message)}
+};
+$('vtSave').onclick=saveVital;
+$('remAdd').onclick=async()=>{
+  const title=$('remTitle').value.trim();
+  if(!title)return toast('请填写提醒内容');
+  try{await api(`/api/residents/${resident.id}/reminders`,'POST',{type:$('remType').value,title,due_date:$('remDate').value||localDate()});$('remTitle').value='';toast('已添加');renderReminders();renderHome()}catch(e){toast(e.message)}
+};
+$('pwBtn').onclick=changePassword;
+$('claimBtn').onclick=submitClaim;
+$('consentBtn').onclick=toggleConsent;
+$('logoutAll').onclick=async()=>{
+  if(!(await window.AnlinCore.confirmDialog('退出所有设备？')))return;
+  try{await api('/api/auth/logout-all','POST')}catch(e){}
+  logout();
+};
+
+/* ---------- 启动 ---------- */
+fetch('/api/auth/demo-status').then(r=>r.json()).then(s=>{if(s.enabled)$('demoHint').textContent='演示提示：本页可用工作人员开通的账号登录（开发环境示例见管理台）。'}).catch(()=>{});
+if(token){
+  api('/api/me').then(async u=>{me=u;sessionChanged();await enterApp()}).catch(()=>{});
+}else{
+  showLogin();
+}
+$('openReportBtn').addEventListener('click',()=>{if(me?.role==='resident'&&resident)window.anlinReports?.open(resident.id,resident.name)});
+window.addEventListener('anlin-reports-confirmed',e=>{if(me?.role==='resident'&&resident?.id===e.detail?.residentId)renderVitals()});
+document.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));
+$('homeReportBtn').addEventListener('click',()=>{if(me?.role==='resident'&&resident)window.anlinReports?.open(resident.id,resident.name)});
+// expose the shared runtime for tests and modules that reach it via window
+Object.assign(window, {api, toast});
+window.setTrendRange=setTrendRange;
+window.tab=tab;window.setVT=setVT;window.pageVitals=pageVitals;window.saveVital=saveVital;window.delVital=delVital;
+window.openQuiz=openQuiz;window.doneRemind=doneRemind;window.promptEdit=promptEdit;
+window.copyInvite=copyInvite;window.rotateInvite=rotateInvite;window.revokeGrant=revokeGrant;
+window.renderFamilyList=renderFamilyList;window.openFam=openFam;window.declineGrant=declineGrant;
+
+/* ---------- data-act 事件注册（替代内联 onclick，配合 CSP script-src 'self'） ---------- */
+window.AnlinCore.bindActions({
+  'tab': ds => tab(ds.v),
+  'trend-range': ds => setTrendRange(Number(ds.days)),
+  'set-vt': ds => setVT(ds.metric),
+  'del-vital': ds => delVital(Number(ds.id)),
+  'page-vitals': ds => pageVitals(Number(ds.step)),
+  'open-quiz': ds => openQuiz(Number(ds.id)),
+  'done-remind': ds => doneRemind(Number(ds.id)),
+  'copy-invite': () => copyInvite(),
+  'rotate-invite': () => rotateInvite(),
+  'prompt-edit': () => promptEdit(),
+  'revoke-grant': ds => revokeGrant(Number(ds.id)),
+  'open-fam': ds => openFam(Number(ds.rid)),
+  'decline-grant': ds => declineGrant(Number(ds.rid), Number(ds.gid)),
+  'family-back': () => renderFamilyList(),
+});
+})();
+// expose for tests and sibling modules that reach the shared runtime via window
+Object.assign(window, {api, toast});
