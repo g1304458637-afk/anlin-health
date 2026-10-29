@@ -33,6 +33,11 @@ class Settings:
     session_ttl_minutes: int = _int_env("SESSION_TTL_MINUTES", 480)
     # AES-GCM key (base64, 32 bytes) for sensitive fields at rest; unset keeps development plaintext.
     field_encryption_key: str = os.getenv("FIELD_ENCRYPTION_KEY", "")
+    # Comma-separated older FIELD_ENCRYPTION_KEY values (oldest first); kept only
+    # while a key rotation is in progress so old rows stay readable. See
+    # scripts/rotate_field_keys.py.
+    field_encryption_previous_keys: tuple[str, ...] = tuple(
+        x.strip() for x in os.getenv("FIELD_ENCRYPTION_PREVIOUS_KEYS", "").split(",") if x.strip())
     # Brute-force controls for username/password login.
     login_max_attempts: int = _int_env("LOGIN_MAX_ATTEMPTS", 5)
     login_lockout_minutes: int = _int_env("LOGIN_LOCKOUT_MINUTES", 15)
@@ -71,3 +76,12 @@ def validate_settings() -> None:
             raise RuntimeError("Production FIELD_ENCRYPTION_KEY must be valid base64 for 32 bytes") from None
         if len(key) != 32:
             raise RuntimeError("Production FIELD_ENCRYPTION_KEY must decode to 32 bytes")
+        for index, previous in enumerate(getattr(settings, "field_encryption_previous_keys", ()) or (), start=1):
+            try:
+                old = base64.b64decode(previous, validate=True)
+            except (ValueError, TypeError):
+                raise RuntimeError(f"FIELD_ENCRYPTION_PREVIOUS_KEYS[{index}] must be valid base64 for 32 bytes") from None
+            if len(old) != 32:
+                raise RuntimeError(f"FIELD_ENCRYPTION_PREVIOUS_KEYS[{index}] must decode to 32 bytes")
+            if old == key:
+                raise RuntimeError("FIELD_ENCRYPTION_PREVIOUS_KEYS must not repeat the current key")
