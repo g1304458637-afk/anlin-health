@@ -8,14 +8,14 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import Response as BytesResponse
-from sqlalchemy import func, select, update
+from sqlalchemy import delete as sa_delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from cryptography.exceptions import InvalidTag
 
 from ..db import get_db
 from ..config import env_int
-from ..deps import audit, auth_user, check_access
+from ..deps import audit, auth_user, check_access, is_owner
 from ..models import Resident, User, Vital
 from ..ratelimit import SlidingWindowLimiter
 from ..report_models import MedicalReport, ReportRevision, ReportVitalLink
@@ -209,6 +209,38 @@ def get_report(report_id: int, response: Response, user: User = Depends(auth_use
     audit(db, user, "read_report", "medical_report", report.id)
     db.commit()
     return result
+
+
+@router.delete("/reports/{report_id}", status_code=204)
+def delete_report(report_id: int, user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    """Privacy deletion: removes the original file, extraction drafts, review history
+    and every link. Imported vital rows are independent health entries and stay —
+    they can be deleted from the vitals timeline instead. Deletion is limited to
+    the resident themself (staff/admin never destroy resident documents); the audit
+    log keeps only non-content metadata (filename, hash, status, page count)."""
+    report = db.get(MedicalReport, report_id)
+    if report is None:
+        raise HTTPException(404, "报告不存在")
+    resident = db.get(Resident, report.resident_id)
+    check_access(db, user, resident, scope="reports")
+    if not is_owner(user, resident):
+        raise HTTPException(403, "仅档案本人可删除报告")
+    if report.status in {"queued", "processing"}:
+        raise HTTPException(409, "报告正在处理中，请稍后再删除")
+    try:
+        delete_blob(report.storage_key)
+    except FileNotFoundError:
+        pass  # already gone; finish removing the record
+    except (OSError, RuntimeError, ValueError, InvalidTag):
+        raise HTTPException(503, "暂时无法删除报告原件，请稍后再试") from None
+    detail = {"filename": report.filename, "sha256": report.sha256, "status": report.status,
+              "page_count": report.page_count, "revision": report.revision,
+              "confirmed": report.status == "confirmed"}
+    db.execute(sa_delete(ReportVitalLink).where(ReportVitalLink.report_id == report.id))
+    db.execute(sa_delete(ReportRevision).where(ReportRevision.report_id == report.id))
+    db.delete(report)
+    audit(db, user, "delete_report", "medical_report", report.id, detail)
+    db.commit()
 
 
 @router.get("/reports/{report_id}/original")

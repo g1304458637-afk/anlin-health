@@ -108,7 +108,10 @@ class FamilyGrant(Base):
 
 class Vital(Base):
     __tablename__ = "vitals"
-    __table_args__ = (UniqueConstraint("resident_id", "actor_id", "client_request_id", name="uq_vital_client_request"),)
+    __table_args__ = (
+        UniqueConstraint("resident_id", "actor_id", "client_request_id", name="uq_vital_client_request"),
+        Index("ix_vital_resident_type_time", "resident_id", "type", "measured_at"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     resident_id: Mapped[int] = mapped_column(ForeignKey("residents.id"), index=True)
     type: Mapped[str] = mapped_column(String(32))
@@ -119,6 +122,9 @@ class Vital(Base):
     measurement_context: Mapped[str | None] = mapped_column(String(30), nullable=True)
     client_request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    # Soft delete: health entries disappear from every view but remain auditable;
+    # the original values are snapshotted into the audit log on deletion.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -174,6 +180,9 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(60), index=True)
     entity: Mapped[str] = mapped_column(String(40))
     entity_id: Mapped[int] = mapped_column(Integer)
+    # Optional JSON snapshot of the affected values (e.g. deleted vitals), so
+    # "who removed which reading" stays answerable after the fact.
+    detail_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

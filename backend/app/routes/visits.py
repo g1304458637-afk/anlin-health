@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from ..db import get_db
 from ..models import User, Resident, Visit, AuditLog
-from ..deps import require_roles, auth_user, check_access, is_owner, audit, consent_active
+from ..deps import require_roles, auth_user, check_access, is_owner, audit
 from ..schemas import VisitIn, VisitOut, VisitFinish
 from ..reporting import visible_resident_ids
 
@@ -74,9 +74,21 @@ def self_visits(resident_id: int, user: User = Depends(auth_user), db: Session =
 
 @router.get("/admin/summary")
 def admin_summary(user: User = Depends(require_roles("admin")), db: Session = Depends(get_db)):
-    from ..models import Community
+    from ..models import Community, ConsentEvent
     communities = db.scalars(select(Community).order_by(Community.id)).all()
-    records = db.scalars(select(Resident)).all()
+    # Two flat scans instead of one consent query per resident (the previous shape
+    # degraded linearly with community size). Later events win; an unreviewed paper
+    # event never counts as active.
+    latest: dict[int, bool] = {}
+    for resident_id, granted, review_status in db.execute(
+            select(ConsentEvent.resident_id, ConsentEvent.granted, ConsentEvent.review_status)
+            .where(ConsentEvent.purpose == "community_care").order_by(ConsentEvent.id)):
+        latest[resident_id] = bool(granted) and review_status == "approved"
+    counts: dict[int, int] = dict(db.execute(select(Resident.community_id, func.count()).group_by(Resident.community_id)).all())
+    active_counts: dict[int, int] = {}
+    for resident_id, community_id in db.execute(select(Resident.id, Resident.community_id)):
+        if latest.get(resident_id):
+            active_counts[community_id] = active_counts.get(community_id, 0) + 1
     return {"community_count": len(communities), "communities": [
-        {"id": c.id, "name": c.name, "active_resident_count": sum(1 for r in records if r.community_id == c.id and consent_active(db, r.id))}
+        {"id": c.id, "name": c.name, "active_resident_count": active_counts.get(c.id, 0)}
         for c in communities]}

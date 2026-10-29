@@ -20,6 +20,7 @@ def _replay(db, user, resident_id, body):
     if not body.client_request_id:
         return None
     existing = db.scalar(select(Vital).where(Vital.resident_id == resident_id, Vital.actor_id == user.id,
+                                            Vital.deleted_at.is_(None),
                                             Vital.client_request_id == body.client_request_id))
     if existing:
         fields = ("type", "systolic", "diastolic", "glucose_mmol_l", "weight_kg", "measurement_context")
@@ -46,6 +47,7 @@ def vital_series(resident_id: int, metric: str = Query(pattern="^(blood_pressure
     except (OverflowError, ValueError):
         raise HTTPException(422, "日期范围超出支持范围") from None
     records = db.scalars(select(Vital).where(Vital.resident_id == resident_id, Vital.type == metric,
+        Vital.deleted_at.is_(None),
         Vital.measured_at >= start, Vital.measured_at < end).order_by(Vital.measured_at, Vital.id).limit(5001)).all()
     if len(records) > 5000:
         raise HTTPException(422, "这段时间的记录超过5000条，请缩小日期范围后查看完整趋势")
@@ -71,7 +73,7 @@ def vital_series(resident_id: int, metric: str = Query(pattern="^(blood_pressure
 @router.get("/residents/{resident_id}/vitals", response_model=list[VitalOut])
 def list_vitals(resident_id: int, metric: str | None = Query(default=None, pattern="^(blood_pressure|blood_glucose|weight)$"), limit: int = Query(default=50, ge=1, le=100), offset: int = Query(default=0, ge=0), user: User = Depends(auth_user), db: Session = Depends(get_db)):
     check_access(db, user, db.get(Resident, resident_id), scope="vitals")
-    query = select(Vital).where(Vital.resident_id == resident_id)
+    query = select(Vital).where(Vital.resident_id == resident_id, Vital.deleted_at.is_(None))
     if metric:
         query = query.where(Vital.type == metric)
     return db.scalars(query.order_by(Vital.measured_at.desc(), Vital.id.desc()).offset(offset).limit(limit)).all()
@@ -103,7 +105,8 @@ def create_vital(resident_id: int, body: VitalIn, user: User = Depends(auth_user
         existing = _replay(db, user, resident_id, body)
         if existing:
             return existing
-        raise
+        # Defensive: a true constraint race that replay cannot explain.
+        raise HTTPException(409, "记录编号冲突，请修改内容后重新提交") from None
     return record
 
 
@@ -111,15 +114,25 @@ def create_vital(resident_id: int, body: VitalIn, user: User = Depends(auth_user
 def delete_vital(resident_id: int, vital_id: int, user: User = Depends(auth_user), db: Session = Depends(get_db)):
     resident = check_access(db, user, db.get(Resident, resident_id), scope="vitals", write=True)
     record = db.get(Vital, vital_id)
-    if not record or record.resident_id != resident_id:
+    if not record or record.resident_id != resident_id or record.deleted_at is not None:
         raise HTTPException(404, "记录不存在")
     # Only resident owner can delete records; staff entries are audit-tracked and reviewed separately.
     if not is_owner(user, resident):
         raise HTTPException(403, "仅档案本人可删除记录")
-    audit(db, user, "delete_vital", "vital", record.id)
+    # Soft delete: the entry vanishes from every view while the audit trail keeps a
+    # full value snapshot — for health data, "who removed which reading" must stay
+    # answerable. The report-import link is tombstoned (vital_id=None) so the report
+    # side keeps showing which item was once imported, and the row is freed from the
+    # unique constraint. Works in SQLite too, where FK actions may be disabled.
+    audit(db, user, "delete_vital", "vital", record.id, {
+        "type": record.type, "systolic": record.systolic, "diastolic": record.diastolic,
+        "glucose_mmol_l": record.glucose_mmol_l, "weight_kg": record.weight_kg,
+        "measurement_context": record.measurement_context,
+        "measured_at": _as_utc(record.measured_at).isoformat(),
+        "client_request_id": record.client_request_id,
+    })
     from ..report_models import ReportVitalLink
-    # Keep the report/item import tombstone while allowing the owner to remove
-    # the timeline entry, including in SQLite where FK actions may be disabled.
     db.execute(update(ReportVitalLink).where(ReportVitalLink.vital_id == record.id).values(vital_id=None))
-    db.delete(record)
+    record.deleted_at = datetime.now(timezone.utc)
+    record.client_request_id = None  # free the idempotency key; the audit keeps the original
     db.commit()

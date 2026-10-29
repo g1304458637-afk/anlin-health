@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+import json
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import select
@@ -71,5 +73,8 @@ def check_access(db: Session, user: User, resident: Resident | None, scope: str 
     raise HTTPException(404, "档案不存在或无权访问")
 
 
-def audit(db: Session, user: User, action: str, entity: str, entity_id: int):
-    db.add(AuditLog(actor_id=user.id, action=action, entity=entity, entity_id=entity_id))
+def audit(db: Session, user: User, action: str, entity: str, entity_id: int, detail: dict | None = None):
+    """Append an audit entry; `detail` snapshots affected values (never bulk data)
+    so destructive actions stay explainable afterwards."""
+    db.add(AuditLog(actor_id=user.id, action=action, entity=entity, entity_id=entity_id,
+                    detail_json=json.dumps(detail, ensure_ascii=False) if detail else None))

@@ -124,7 +124,9 @@ def test_review_imports_once_and_preserves_candidate(client, token, db, monkeypa
     assert after_delete["imported_vital_ids"] == []
     assert after_delete["deleted_import_count"] == 1
     assert client.post(url, json=review, headers=token("resident")).status_code == 200
-    assert db.query(Vital).count() == 0
+    # Deletion is soft: the row is retained for audit, hidden from every view.
+    retained = db.query(Vital).one()
+    assert retained.deleted_at is not None
     assert db.query(ReportVitalLink).count() == 1
 
 

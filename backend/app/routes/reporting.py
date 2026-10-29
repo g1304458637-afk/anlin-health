@@ -23,7 +23,7 @@ def health_stats(limit: int = Query(default=25, ge=1, le=100),
     total = db.scalar(select(func.count()).select_from(Resident).where(Resident.id.in_(visible))) or 0
     totals = {"blood_pressure": 0, "blood_glucose": 0, "weight": 0}
     for metric, count in db.execute(select(Vital.type, func.count()).where(
-            Vital.resident_id.in_(visible)).group_by(Vital.type)):
+            Vital.resident_id.in_(visible), Vital.deleted_at.is_(None)).group_by(Vital.type)):
         if metric in totals:
             totals[metric] = count
 
@@ -32,7 +32,8 @@ def health_stats(limit: int = Query(default=25, ge=1, le=100),
     end = datetime.combine(today + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
     counts = {str(day): count for day, count in db.execute(
         select(func.date(Vital.measured_at), func.count()).where(
-            Vital.resident_id.in_(visible), Vital.measured_at >= start, Vital.measured_at < end)
+            Vital.resident_id.in_(visible), Vital.deleted_at.is_(None),
+            Vital.measured_at >= start, Vital.measured_at < end)
         .group_by(func.date(Vital.measured_at)))}
     daily = [{"date": (today - timedelta(days=i)).isoformat(),
               "count": counts.get((today - timedelta(days=i)).isoformat(), 0)} for i in range(13, -1, -1)]
@@ -47,11 +48,11 @@ def health_stats(limit: int = Query(default=25, ge=1, le=100),
     record_counts, latest = {}, {}
     if ids:
         record_counts = dict(db.execute(select(Vital.resident_id, func.count()).where(
-            Vital.resident_id.in_(ids)).group_by(Vital.resident_id)).all())
+            Vital.resident_id.in_(ids), Vital.deleted_at.is_(None)).group_by(Vital.resident_id)).all())
         ranked = select(Vital.id, func.row_number().over(
             partition_by=(Vital.resident_id, Vital.type),
             order_by=(Vital.measured_at.desc(), Vital.id.desc())).label("rank")).where(
-                Vital.resident_id.in_(ids)).subquery()
+                Vital.resident_id.in_(ids), Vital.deleted_at.is_(None)).subquery()
         for v in db.scalars(select(Vital).join(ranked, ranked.c.id == Vital.id).where(ranked.c.rank == 1)):
             latest[(v.resident_id, v.type)] = VitalOut.model_validate(v).model_dump(mode="json")
     rows = [{"id": r.id, "name": r.name, "record_count": record_counts.get(r.id, 0),
