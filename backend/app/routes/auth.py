@@ -13,13 +13,24 @@ from ..models import User, Resident, ClaimRequest
 from ..ratelimit import login_limiter, wechat_limiter, register_limiter, client_ip
 from ..security import verify_password, validate_password_strength, hash_password, access_token, new_invite_code
 from ..deps import auth_user, audit
-from ..totp import verify_totp
+from ..totp import match_totp_counter
 from ..schemas import (LoginIn, WxLoginIn, PasswordChangeIn, TotpLoginIn, RegisterFamilyIn, UserOut,
                        TotpSetupIn, TotpConfirmIn, TotpDisableIn)
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-\u4e00-\u9fa5]{4,40}$")  # 中文用户名对老年居民更友好
+
+_dummy_hash: str | None = None
+
+
+def _timing_equalizer_hash() -> str:
+    """A throwaway PBKDF2 hash so unknown usernames cost the same as wrong
+    passwords and cannot be enumerated by response timing."""
+    global _dummy_hash
+    if _dummy_hash is None:
+        _dummy_hash = hash_password("timing-equalizer-占位-Abcdef9527")
+    return _dummy_hash
 
 # One-time WeChat codes: a replayed code is rejected without contacting WeChat again.
 _used_wx_codes: dict[str, float] = {}
@@ -75,9 +86,13 @@ def _verify_mfa_password(user: User, password: str, db: Session) -> None:
 
 
 def _verify_current_factor(user: User, code: str | None, db: Session) -> None:
-    if not verify_totp(user.totp_secret, code):
+    """Verify the active factor and record its counter so the same shown code
+    cannot be reused for a later confirmation or sign-in."""
+    counter = match_totp_counter(user.totp_secret, code)
+    if counter is None or counter <= user.totp_last_used_counter:
         _record_login_failure(user, db, datetime.now(timezone.utc), "mfa_totp_failed")
         raise HTTPException(401, "当前两步验证码不正确")
+    user.totp_last_used_counter = counter
 
 
 def _clear_auth_failures(user: User) -> None:
@@ -98,6 +113,8 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.username == body.username))
     now = datetime.now(timezone.utc)
     _check_login_lock(user, now)
+    if not user:
+        verify_password(body.password, _timing_equalizer_hash())
     if not user or not verify_password(body.password, user.password_hash):
         _record_login_failure(user, db, now, "password_login_failed")
         raise HTTPException(401, "用户名或密码错误")
@@ -116,14 +133,20 @@ def login_totp(body: TotpLoginIn, request: Request, db: Session = Depends(get_db
     user = db.scalar(select(User).where(User.username == body.username))
     now = datetime.now(timezone.utc)
     _check_login_lock(user, now)
-    if not user or not user.totp_secret or not verify_password(body.password, user.password_hash):
+    if not user or not user.totp_secret:
+        verify_password(body.password, _timing_equalizer_hash())
+        _record_login_failure(user, db, now, "password_login_failed")
+        raise HTTPException(401, "用户名或密码错误")
+    if not verify_password(body.password, user.password_hash):
         _record_login_failure(user, db, now, "password_login_failed")
         raise HTTPException(401, "用户名或密码错误")
     if not user.is_active:
         raise HTTPException(403, "账号已停用")
-    if not verify_totp(user.totp_secret, body.totp_code):
+    counter = match_totp_counter(user.totp_secret, body.totp_code)
+    if counter is None or counter <= user.totp_last_used_counter:
         _record_login_failure(user, db, now, "totp_failed")
         raise HTTPException(401, "两步验证码不正确")
+    user.totp_last_used_counter = counter
     return _issue_login(user, db, "password_login_totp")
 
 
@@ -192,7 +215,8 @@ def confirm_totp(body: TotpConfirmIn, user: User = Depends(auth_user), db: Sessi
     now = datetime.now(timezone.utc)
     if not user.totp_pending_secret or not user.totp_pending_expires_at or user.totp_pending_expires_at.replace(tzinfo=None) <= now.replace(tzinfo=None):
         raise HTTPException(409, "待确认的两步验证已失效，请重新设置")
-    if not verify_totp(user.totp_pending_secret, body.totp_code):
+    counter = match_totp_counter(user.totp_pending_secret, body.totp_code)
+    if counter is None or counter <= user.totp_last_used_counter:
         user.totp_pending_failures += 1
         if user.totp_pending_failures >= 5:
             user.totp_pending_secret = None
@@ -200,6 +224,7 @@ def confirm_totp(body: TotpConfirmIn, user: User = Depends(auth_user), db: Sessi
             user.totp_pending_failures = 0
         _record_login_failure(user, db, now, "mfa_totp_confirm_failed")
         raise HTTPException(401, "两步验证码不正确")
+    user.totp_last_used_counter = counter
     user.totp_secret = user.totp_pending_secret
     user.totp_pending_secret = None
     user.totp_pending_expires_at = None

@@ -56,10 +56,24 @@ def verify_password(password: str, stored: str | None) -> bool:
 
 
 def _key() -> str:
-    key = settings.secret_key
-    if not key and settings.app_env != "production":
-        key = "DEV_INSECURE_ONLY_REPLACE_BEFORE_DEPLOY"
-    return key
+    global _ephemeral_key
+    if settings.secret_key:
+        return settings.secret_key
+    if settings.app_env == "production":
+        # validate_settings() refuses to start production without SECRET_KEY;
+        # this guard keeps token signing safe even if that check is bypassed.
+        raise RuntimeError("Production requires SECRET_KEY")
+    # No public fallback constant: an ephemeral per-process key means a missing
+    # config degrades to "sessions reset on restart" instead of "anyone can
+    # forge tokens with a key that is in the public repository".
+    if not _ephemeral_key:
+        _ephemeral_key = base64.urlsafe_b64encode(secrets.token_bytes(48)).decode()
+        print("WARNING: SECRET_KEY is not configured; using an ephemeral key for this process only. "
+              "All sessions will be invalidated on restart.", flush=True)
+    return _ephemeral_key
+
+
+_ephemeral_key: str | None = None
 
 
 def access_token(user_id: int, token_version: int = 0) -> str:

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from cryptography.exceptions import InvalidTag
 
 from ..db import get_db
+from ..config import env_int
 from ..deps import audit, auth_user, check_access
 from ..models import Resident, User, Vital
 from ..ratelimit import SlidingWindowLimiter
@@ -29,6 +30,7 @@ _MAX_REPORTS_PER_RESIDENT = 200
 _MIMES = {"application/pdf", "image/png", "image/jpeg", "image/webp"}
 _NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 _extract_limiter = SlidingWindowLimiter()
+_upload_limiter = SlidingWindowLimiter()
 
 
 def _accessible(db: Session, user: User, report_id: int, *, write: bool = False) -> tuple[MedicalReport, Resident]:
@@ -94,6 +96,10 @@ async def upload_report(resident_id: int, request: Request, response: Response, 
                         user: User = Depends(auth_user), db: Session = Depends(get_db)):
     response.headers.update(_NO_STORE)
     check_access(db, user, db.get(Resident, resident_id), scope="reports", write=True)
+    # Uploads persist up to 10 MiB each and trigger subprocess parsing; without a
+    # per-user throttle a signed-in account could fill the disk at will.
+    if not _upload_limiter.hit(f"report-upload:{user.id}", env_int("REPORT_UPLOAD_RATE_PER_HOUR", 30), 3600):
+        raise HTTPException(429, "上传过于频繁，请稍后再试")
     filename = _safe_filename(filename)
     declared_mime = request.headers.get("content-type", "").split(";", 1)[0].lower().strip()
     if declared_mime not in _MIMES:

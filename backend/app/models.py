@@ -35,6 +35,9 @@ class User(Base):
     totp_pending_secret: Mapped[str | None] = mapped_column(EncryptedString(200), nullable=True)
     totp_pending_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     totp_pending_failures: Mapped[int] = mapped_column(Integer, default=0)
+    # Highest TOTP counter step consumed for the active factor; a shown code
+    # cannot be replayed inside the accept window.
+    totp_last_used_counter: Mapped[int] = mapped_column(Integer, default=0)
     # Raised on password change / global sign-out; older tokens stop working immediately.
     token_version: Mapped[int] = mapped_column(Integer, default=0)
     password_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

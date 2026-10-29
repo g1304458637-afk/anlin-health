@@ -100,7 +100,10 @@ def test_logout_all_invalidates_existing_token(client, token):
 
 # ---- TOTP second factor ---------------------------------------------------------
 
-def test_totp_flow(client, token):
+def test_totp_flow(client, token, monkeypatch):
+    class _Clock:
+        value = time.time()
+    monkeypatch.setattr(totp_mod, "_now", lambda: _Clock.value)
     h = token('staff')
     setup = client.post('/api/auth/mfa/totp', headers=h, json={'current_password': 'DemoPass2026!'})
     assert setup.status_code == 200
@@ -108,7 +111,7 @@ def test_totp_flow(client, token):
     assert setup.json()['uri'].startswith('otpauth://totp/')
     # Provisioning does not activate the factor until the staged code is proven.
     assert login(client, 'staff').status_code == 200
-    code = totp_mod._code_at(secret, int(time.time() // 30))
+    code = totp_mod._code_at(secret, int(_Clock.value // 30))
     confirmed = client.post('/api/auth/mfa/totp/confirm', headers=h,
                             json={'current_password': 'DemoPass2026!', 'totp_code': code})
     assert confirmed.status_code == 200
@@ -119,12 +122,18 @@ def test_totp_flow(client, token):
     assert r.status_code == 401 and r.headers.get('X-MFA-Required') == 'totp'
     wrong = client.post('/api/auth/login/totp', json={'username': 'staff', 'password': 'DemoPass2026!', 'totp_code': '000000'})
     assert wrong.status_code == 401
-    good = client.post('/api/auth/login/totp', json={'username': 'staff', 'password': 'DemoPass2026!', 'totp_code': code})
+    # The confirmation consumed that code; a login needs the next window's code.
+    assert client.post('/api/auth/login/totp', json={'username': 'staff', 'password': 'DemoPass2026!', 'totp_code': code}).status_code == 401
+    _Clock.value += totp_mod.STEP_SECONDS + 1
+    login_code = totp_mod._code_at(secret, int(_Clock.value // 30))
+    good = client.post('/api/auth/login/totp', json={'username': 'staff', 'password': 'DemoPass2026!', 'totp_code': login_code})
     assert good.status_code == 200
     assert client.get('/api/me', headers={'Authorization': 'Bearer ' + good.json()['access_token']}).json()['username'] == 'staff'
     # Disabling MFA rotates the token version and clears the factor.
+    _Clock.value += totp_mod.STEP_SECONDS + 1
+    disable_code = totp_mod._code_at(secret, int(_Clock.value // 30))
     assert client.request('DELETE', '/api/auth/mfa/totp', headers=h,
-                          json={'current_password': 'DemoPass2026!', 'totp_code': code}).status_code == 200
+                          json={'current_password': 'DemoPass2026!', 'totp_code': disable_code}).status_code == 200
     assert login(client, 'staff').status_code == 200
 
 

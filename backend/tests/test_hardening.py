@@ -15,8 +15,8 @@ from app.ratelimit import claim_limiter, login_limiter
 PASSWORD = "DemoPass2026!"
 
 
-def _code(secret):
-    return totp._code_at(secret, int(time.time() // 30))
+def _code(secret, counter=None):
+    return totp._code_at(secret, counter if counter is not None else int(time.time() // totp.STEP_SECONDS))
 
 
 def _bearer(token):
@@ -64,8 +64,18 @@ def test_resident_patch_rejects_null_required_fields(client, token, db):
     assert client.get("/api/residents/1", headers=h).json()["name"] == "虚构王一"
 
 
-def test_mfa_requires_credentials_and_confirm_then_rotates_sessions(client, token, db):
+def test_mfa_requires_credentials_and_confirm_then_rotates_sessions(client, token, db, monkeypatch):
     login_limiter.reset()
+
+    class _Clock:
+        value = time.time()
+    monkeypatch.setattr(totp, "_now", lambda: _Clock.value)
+
+    def next_window():
+        # A shown code is single-use now; move to the next 30s step for a fresh one.
+        _Clock.value += totp.STEP_SECONDS + 1
+        return int(_Clock.value // totp.STEP_SECONDS)
+
     initial = token("staff")
     assert client.post("/api/auth/mfa/totp", headers=initial, json={"current_password": "wrong"}).status_code == 401
     staged = client.post("/api/auth/mfa/totp", headers=initial, json={"current_password": PASSWORD})
@@ -84,8 +94,11 @@ def test_mfa_requires_credentials_and_confirm_then_rotates_sessions(client, toke
     assert client.post("/api/auth/mfa/totp", headers=current, json={"current_password": PASSWORD}).status_code == 401
     assert client.post("/api/auth/mfa/totp", headers=current, json={
         "current_password": "wrong", "totp_code": _code(first_secret)}).status_code == 401
+    # The code consumed by the confirmation cannot stage a rotation in the same window.
+    assert client.post("/api/auth/mfa/totp", headers=current, json={
+        "current_password": PASSWORD, "totp_code": _code(first_secret)}).status_code == 401
     rotation = client.post("/api/auth/mfa/totp", headers=current, json={
-        "current_password": PASSWORD, "totp_code": _code(first_secret)})
+        "current_password": PASSWORD, "totp_code": _code(first_secret, next_window())})
     assert rotation.status_code == 200
     second_secret = rotation.json()["secret"]
     assert second_secret != first_secret
@@ -94,12 +107,12 @@ def test_mfa_requires_credentials_and_confirm_then_rotates_sessions(client, toke
     assert client.request("DELETE", "/api/auth/mfa/totp", headers=current,
                           json={"current_password": PASSWORD, "totp_code": "abcdef"}).status_code == 401
     rotated = client.post("/api/auth/mfa/totp/confirm", headers=current, json={
-        "current_password": PASSWORD, "totp_code": _code(second_secret)})
+        "current_password": PASSWORD, "totp_code": _code(second_secret, next_window())})
     assert rotated.status_code == 200
     assert client.get("/api/me", headers=current).status_code == 401
     current = _bearer(rotated.json()["access_token"])
     disabled = client.request("DELETE", "/api/auth/mfa/totp", headers=current,
-                              json={"current_password": PASSWORD, "totp_code": _code(second_secret)})
+                              json={"current_password": PASSWORD, "totp_code": _code(second_secret, next_window())})
     assert disabled.status_code == 200
     assert client.get("/api/me", headers=current).status_code == 401
     assert client.get("/api/me", headers=_bearer(disabled.json()["access_token"])).status_code == 200

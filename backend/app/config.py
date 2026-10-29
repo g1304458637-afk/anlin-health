@@ -10,6 +10,12 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
+def env_int(name: str, default: int) -> int:
+    """Read an integer knob at call time so deployments can tune limits via env
+    without redeploying and tests can override them per case."""
+    return _int_env(name, default)
+
+
 @dataclass(frozen=True)
 class Settings:
     app_env: str = os.getenv("APP_ENV", "development")
