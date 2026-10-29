@@ -1,21 +1,21 @@
 {
-  "version": "0.6.0-dev",
+  "version": "0.7.0-dev",
   "status": "local development candidate",
-  "date": "2026-10-23",
+  "date": "2026-10-29",
   "built_at_utc": "2026-10-23T12:02:54.015574+00:00",
   "baseline_commit": "1ea6061234da24e03876d77c969da1a0426b94de",
   "branch": "codex/anlin-web-agent-20261023",
   "source_worktree": ".",
   "source_file_count": 137,
   "source_manifest_sha256": "90d7031a3d5d663e477b05481f4aec45e150d80bd9f73c5e5c573c8e74092e1e",
-  "scope": "source and synthetic verification artifacts excluding BUILD-IDENTITY.json and SHA256SUMS.txt",
+  "scope": "source update: security hardening (DB-backed rate limiting, TOTP replay guard, key rotation, strict script CSP) and data lifecycle (soft-delete audit, report privacy deletion)",
   "verification": {
-    "backend_tests_passed": 133,
-    "frontend_tests_passed": 13,
-    "browser": "real local backend, fictional confirmed report; report opt-in, creatinine77/page2 citation, jump to originalpage2, revocation clears conversation",
+    "backend_tests_passed": 222,
+    "frontend_tests_passed": 30,
+    "browser": "real local backend smoke: resident login, data-act tab/nav delegation, shared confirm dialog, Inter font load, console aggregate stats; report deletion covered by API tests",
     "deepseek": "final live report glucose, corrected title, missing potassium and medical-boundary cases passed; final browser page2 lookup passed",
     "bounded_retry": "at most 1 retry for transient transport or malformed structure; rechecks authorization and source before every send",
-    "not_proven": "real hospital accuracy, clinical validity, production readiness or uninterrupted provider availability"
+    "not_proven": "real hospital accuracy, clinical validity, production readiness, uninterrupted provider availability, penetration testing"
   },
   "production_deployed": false,
   "uses_original_database": false,

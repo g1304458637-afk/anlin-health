@@ -1,6 +1,19 @@
-# v0.6 本地开发版验证记录
+# 本地开发版验证记录
 
-日期：2026-10-23。基线：main@1ea6061；开发分支：codex/anlin-web-agent-20261023。
+最新轮次为 v0.7（2026-10-29，见文末"v0.7 验证记录"）；v0.6 及之前的记录保留在下方，作为历史版本的验证证据。
+
+## v0.7 验证记录（2026-10-29，安全与数据生命周期批次）
+
+- **范围**：在 v0.6 提交 `b57f5e5` 之上（本地分支 `local/anlin-improvements`），新增 7 个功能提交：portal 血糖下拉框修复、TOTP 防重放/JWT/限速/登录时序、限流与微信 code 防重放落库、软删除与报告隐私删除、字段密钥版本化与轮换脚本、网页资产外置与严格 CSP、文档同步。
+- **自动化**：后端 `pytest -q` 222 项全部通过（Python 3.14.7，Windows，隔离临时 SQLite；含新增 test_security_hardening.py、test_lifecycle.py、test_crypto_rotation.py 共 21 项回归）。前端 `node --test frontend/tests/*.test.mjs` 30 项全部通过（测试装置已改为加载外置 js/app-core.js 与页面 bundle）。`scripts/check_web_syntax.py` 覆盖全部外置 JS。
+- **真实浏览器抽检**（ZCode 内置浏览器连接 `http://127.0.0.1:8000` 真实 uvicorn + 演示种子库）：居民账号登录进入门户，底栏 `data-act` 委托切换标签正常；"退出所有设备"触发的是页内自定义确认对话框（非原生弹窗），取消后会话保持；Inter 字体经 `/static/fonts/*.woff2` 加载成功（document.fonts 状态 loaded）；页面内联事件处理器计数为 0。工作台 staff 登录后聚合统计与侧边导航 `data-act` 切换正常。`/healthz` 200，四个静态资源抽查均 200。
+- **边界**：本轮未重跑 DeepSeek 真实调用、未做 PostgreSQL 演练、无渗透测试；跨库/备份的删除同步与密钥轮换的 PostgreSQL 实操仍是未验收项。多进程部署下限流正确性由共享表设计保证，但仅以单进程测试验证。
+
+---
+
+# v0.6 验证记录（2026-10-23，历史）
+
+基线：main@1ea6061；开发分支：codex/anlin-web-agent-20261023。
 
 ## 验证环境与边界
 

@@ -96,10 +96,10 @@ docker compose -f ops/compose.demo.yml exec api python -m app.seed
 1. PostgreSQL + Alembic 迁移 + 最小权限账号 + 定期备份与**恢复演练**（迁移脚本已具备，演练未做）。
 2. 机构账号开通流程：在已迁移的空库运行上面的首次初始化脚本；后续员工开通需单独审批。按需开通 TOTP（`POST /api/auth/mfa/totp`，认证器绑定走人工流程）；生产自动禁用 `/api/auth/dev-login` 与演示提示。
 3. 反向代理/平台提供 HTTPS（应用在生产自动下发 HSTS）；`ALLOWED_HOSTS` 必须配置，否则启动即拒绝。
-4. `SECRET_KEY` ≥48 位随机、`FIELD_ENCRYPTION_KEY` 为 32 字节 base64（生产缺一启动即拒绝），均从密钥管理注入；**密钥轮换流程未实现**，当前轮换需人工重加密迁移。
-5. 限流为进程内存实现：**多 worker/多实例部署必须替换为共享存储（Redis 等）**，见 `app/ratelimit.py` 模块注释。
-6. 微信生产凭据仅在服务端配置；code 已做一次性防重放，仍需真实联调验收。
-7. 医疗健康敏感个人信息：报告原件及候选/确认文本的保留、删除、备份、恢复和密钥轮换制度；日志脱敏、供应商数据传输审查、合规评审、渗透测试及真实医院样本人工验收，全部仍是阻塞项。
+4. `SECRET_KEY` ≥48 位随机、`FIELD_ENCRYPTION_KEY` 为 32 字节 base64（生产缺一启动即拒绝），均从密钥管理注入。**密钥轮换**（v0.7 起）：新密钥设为 `FIELD_ENCRYPTION_KEY`、旧密钥放入 `FIELD_ENCRYPTION_PREVIOUS_KEYS`（逗号分隔，最旧在前），运行 `python scripts/rotate_field_keys.py --check` 直至 TOTAL 为 0，再从环境移除旧密钥；脚本运行期间应用保持可读。
+5. 限流与微信 code 一次性防重放（v0.7 起）保存在数据库表 `rate_events`/`single_use_tokens`，多 worker/多实例部署下依然有效，无需额外共享存储；高并发场景可再演进为 Redis。
+6. 微信生产凭据仅在服务端配置；code 已做跨进程一次性防重放，仍需真实联调验收。
+7. 医疗健康敏感个人信息：报告已提供本人隐私删除（`DELETE /api/reports/{id}`，删原件与全部派生数据）与测量软删除审计快照；跨备份/从库的删除同步、留存期、日志脱敏、供应商数据传输审查、合规评审、渗透测试及真实医院样本人工验收，全部仍是阻塞项。
 
 ## 环境变量
 
