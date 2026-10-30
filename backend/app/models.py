@@ -196,6 +196,43 @@ class RateEvent(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class RiskAlert(Base):
+    """Non-diagnostic threshold notice raised when a reading is out of the
+    common reference range. Values live on the linked vital; this row is the
+    notification surface for staff and family."""
+    __tablename__ = "risk_alerts"
+    __table_args__ = (Index("ix_risk_alert_resident_created", "resident_id", "created_at"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    resident_id: Mapped[int] = mapped_column(ForeignKey("residents.id"), index=True)
+    vital_id: Mapped[int | None] = mapped_column(ForeignKey("vitals.id", ondelete="SET NULL"), nullable=True)
+    metric: Mapped[str] = mapped_column(String(32))
+    level: Mapped[str] = mapped_column(String(16), index=True)  # warning / critical
+    value_text: Mapped[str] = mapped_column(String(120))
+    message: Mapped[str] = mapped_column(String(300))
+    acknowledged_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Appointment(Base):
+    """Resident booking request (community staff visit or doctor-visit accompaniment).
+    Doctors are not system users in the pilot; a booking is an offline-coordinated request."""
+    __tablename__ = "appointments"
+    __table_args__ = (Index("ix_appointment_resident_created", "resident_id", "created_at"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    resident_id: Mapped[int] = mapped_column(ForeignKey("residents.id"), index=True)
+    requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(16))  # staff / doctor
+    preferred_date: Mapped[date] = mapped_column(Date)
+    time_slot: Mapped[str] = mapped_column(String(16))  # morning / afternoon
+    note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending/confirmed/completed/cancelled
+    handled_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    response_note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
 class SingleUseToken(Base):
     """Server-side one-time tokens (e.g. WeChat login codes), stored hashed.
 

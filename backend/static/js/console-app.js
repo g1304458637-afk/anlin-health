@@ -10,7 +10,7 @@ const api=window.AnlinCore.createApi({getToken:()=>token,getVersion:()=>sessionV
 // expose the shared runtime for tests and modules that reach it via window
 Object.assign(window, {api, notify});
 
-async function login(totpCode){if(loginBusy&&!totpCode)return;if(!totpCode)loginBusy=true;try{const path=totpCode?'/api/auth/login/totp':'/api/auth/login';const payload=totpCode?{username:$('username').value.trim(),password:$('password').value,totp_code:totpCode}:{username:$('username').value.trim(),password:$('password').value};const out=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const body=await out.json().catch(()=>({}));if(out.status===401&&out.headers.get('X-MFA-Required')==='totp'){const code=await window.AnlinCore.promptDialog('此账号已开启两步验证，请输入认证器中的6位验证码：');if(code)await login(code.trim());return}if(!out.ok)throw new Error(typeof body.detail==='string'?body.detail:'登录失败');if(!['staff','admin'].includes(body.user?.role))throw new Error('此入口仅供社区工作人员或管理员使用，居民和家属请使用居民服务入口');logout();token=body.access_token;me=body.user;sessionChanged();$('loginShade').classList.add('hidden');$('greet').textContent=me.display_name+'，欢迎回到工作台。';$('avatar').textContent=(me.display_name||'安').slice(-1);await refresh()}catch(e){notify('登录失败：'+e.message)}finally{if(!totpCode)loginBusy=false}}
+async function login(totpCode){if(loginBusy&&!totpCode)return;if(!totpCode)loginBusy=true;try{const path=totpCode?'/api/auth/login/totp':'/api/auth/login';const payload=totpCode?{username:$('username').value.trim(),password:$('password').value,totp_code:totpCode}:{username:$('username').value.trim(),password:$('password').value};const out=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const body=await out.json().catch(()=>({}));if(out.status===401&&out.headers.get('X-MFA-Required')==='totp'){const code=await window.AnlinCore.promptDialog('此账号已开启两步验证，请输入认证器中的6位验证码：');if(code)await login(code.trim());return}if(!out.ok)throw new Error(typeof body.detail==='string'?body.detail:'登录失败');if(!['staff','admin'].includes(body.user?.role))throw new Error('此入口仅供社区工作人员或管理员使用，居民和家属请使用居民服务入口');logout();token=body.access_token;me=body.user;sessionChanged();$('loginShade').classList.add('hidden');$('greet').textContent=me.display_name+'，欢迎回到工作台。';$('avatar').textContent=(me.display_name||'安').slice(-1);await refresh();maybeShowRiskPopup()}catch(e){notify('登录失败：'+e.message)}finally{if(!totpCode)loginBusy=false}}
 (async()=>{try{const s=await(await fetch('/api/auth/demo-status')).json();if(s.enabled){$('demoHint').classList.remove('hidden');$('username').value='staff'}}catch{}})()
 function logout(){token='';me=null;residents=[];visits=[];residentOffset=0;residentHasMore=false;residentQuery='';statsOffset=0;statsQuery='';residentRequestSeq++;statsRequestSeq++;visitRequestSeq++;visitStatsRequestSeq++;visitItems=[];visitOffset=0;visitFilter='planned';visitTotal=0;visitLoading=false;visitTotals={total:0,planned:0,done:0,overdue:0};$('visitStatus').value='planned';$('visitStatus').disabled=false;$('visitSummary').textContent='';$('visitPageLabel').textContent='第 1 页';$('visitPrev').disabled=true;$('visitNext').disabled=true;clearTimeout(residentSearchTimer);clearTimeout(statsSearchTimer);sessionChanged();clearAdminAccounts();closeModal();$('modalFields').replaceChildren();$('modalTitle').textContent='操作';$('modalDesc').textContent='';$('toast').textContent='';$('toast').classList.add('hidden');$('loginShade').classList.remove('hidden');$('username').value='';$('password').value='';$('pwCur').value='';$('pwNew').value='';$('mfaPassword').value='';$('mfaExistingCode').value='';$('mfaSecret').replaceChildren();$('mfaSecret').classList.add('hidden');$('search').value='';$('search2').value='';$('statsSearch').value='';$('newResident').disabled=false;$('provisionResidentView').disabled=false;$('createResidentView').disabled=false;for(const id of ['residentCount','visitCount','greet','avatar','claimCount','consentCount','acctInfo'])$(id).textContent='—';for(const id of ['residentRows','residentTable2','visitRows','visitList','claimQueue','consentQueue','residentPaging','statsPaging','statChips','statChart','latestBody'])$(id).replaceChildren();currentView='overview';document.querySelectorAll('#sideNav > div').forEach(el=>el.classList.toggle('active',el.dataset.view==='overview'));document.querySelectorAll('.view').forEach(el=>el.classList.toggle('hidden',el.id!=='view-overview'))}
 async function refresh(){
@@ -93,6 +93,8 @@ function switchView(v){
   if(v==='visits')loadVisitList();
   if(v==='stats')loadStats();
   if(v==='settings')renderSettings();
+  if(v==='risk')loadRiskView();
+  if(v==='appointments')loadAppointmentsView();
 }
 let currentView='overview';
 let adminUsers=[],adminCommunities=[],adminRequestSeq=0,adminActionBusy=new Set();
@@ -310,6 +312,69 @@ async function logoutAllDevices(){
   try{await api('/api/auth/logout-all','POST');logout();notify('已在所有设备退出登录')}catch(e){notify(e.message)}
 }
 
+/* ------- 风险预警 ------- */
+const RISK_METRICS={blood_pressure:'血压',blood_glucose:'血糖',weight:'体重'};
+let riskOffset=0;
+async function loadRiskView(){
+  const version=sessionVersion;
+  const level=$('riskLevel').value,status=$('riskStatus').value;
+  try{
+    const qs=new URLSearchParams({status,limit:'25',offset:String(riskOffset)});
+    if(level)qs.set('level',level);
+    const data=await api(`/api/community/risk-alerts?${qs}`);
+    if(version!==sessionVersion||currentView!=='risk')return;
+    $('riskOpenCount').textContent=data.open_count;
+    $('riskRows').innerHTML=data.items.length?data.items.map(a=>{
+      const time=new Date(a.created_at);const when=isNaN(time)?'':time.toLocaleString('zh-CN');
+      const action=a.acknowledged_at?'<span class="sub">已处理</span>':`<button class="btn btn-sm" data-act="ack-risk" data-id="${a.id}">标记已处理</button>`;
+      const levelTag=a.level==='critical'?'<span class="chip" style="background:#FDECE8;color:#C2453A">需尽快关注</span>':'<span class="chip">关注</span>';
+      return '<tr><td>'+(a.resident_name||('#'+a.resident_id))+'</td><td>'+(RISK_METRICS[a.metric]||a.metric)+'</td><td>'+levelTag+'</td><td>'+clean(a.value_text)+'</td><td>'+when+'</td><td class="sub" style="max-width:320px">'+clean(a.message)+'</td><td>'+action+'</td></tr>';
+    }).join(''):'<tr><td colspan="7" class="empty">当前筛选下没有预警记录</td></tr>';
+    $('riskPaging').innerHTML='<button class="btn btn-sm" '+(riskOffset?'':'disabled')+' data-act="page-risk" data-step="-1">上一页</button><span class="sub">第 '+(Math.floor(riskOffset/25)+1)+' 页</span><button class="btn btn-sm" '+(riskOffset+25>=data.total?'':'disabled')+' data-act="page-risk" data-step="1">下一页</button>';
+  }catch(e){notify(e.message)}
+}
+async function ackRisk(id){
+  try{await api(`/api/community/risk-alerts/${id}/ack`,'POST');notify('已标记为处理完成');loadRiskView()}catch(e){notify(e.message)}
+}
+/* ------- 预约管理 ------- */
+const APPT_STATUS={pending:'待确认',confirmed:'已确认',completed:'已完成',cancelled:'已取消'};
+let apptOffset=0;
+async function loadAppointmentsView(){
+  const version=sessionVersion;
+  const status=$('apptStatus').value;
+  try{
+    const data=await api(`/api/community/appointments?status=${status}&limit=25&offset=${apptOffset}`);
+    if(version!==sessionVersion||currentView!=='appointments')return;
+    $('apptRows').innerHTML=data.items.length?data.items.map(a=>{
+      const buttons=[];
+      if(a.status==='pending')buttons.push(`<button class="btn btn-sm" data-act="appt-confirm" data-id="${a.id}">确认</button>`);
+      if(a.status==='confirmed')buttons.push(`<button class="btn btn-sm" data-act="appt-complete" data-id="${a.id}">完成</button>`);
+      if(a.status==='pending'||a.status==='confirmed')buttons.push(`<button class="btn btn-sm btn-danger" data-act="appt-cancel" data-id="${a.id}">取消</button>`);
+      return '<tr><td>'+(a.resident_name||('#'+a.resident_id))+'</td><td>'+clean(a.kind_label)+'</td><td>'+clean(a.preferred_date)+' '+clean(a.time_slot_label)+'</td><td class="sub" style="max-width:220px">'+clean(a.note||'—')+'</td><td>'+(APPT_STATUS[a.status]||a.status)+'</td><td><div class="ar-row" style="gap:6px">'+buttons.join(' ')+'</div></td></tr>';
+    }).join(''):'<tr><td colspan="6" class="empty">当前状态下没有预约</td></tr>';
+    $('apptPaging').innerHTML='<button class="btn btn-sm" '+(apptOffset?'':'disabled')+' data-act="page-appt" data-step="-1">上一页</button><span class="sub">第 '+(Math.floor(apptOffset/25)+1)+' 页</span><button class="btn btn-sm" '+(apptOffset+25>=data.total?'':'disabled')+' data-act="page-appt" data-step="1">下一页</button>';
+  }catch(e){notify(e.message)}
+}
+function apptAction(id,action,label,needNote){
+  const run=async note=>{
+    try{await api(`/api/community/appointments/${id}/${action}`,'POST',{response_note:note||null});notify(label+'成功');loadAppointmentsView()}catch(e){notify(e.message)}
+  };
+  if(needNote){modal(label+'预约','可填写给居民看的回复说明（选填）。',field('回复说明','response_note','text','maxlength="300"'),async d=>{await run(d.get('response_note'))})}
+  else run(null);
+}
+/* 员工登录后一次性弹窗：未处理预警。 */
+async function maybeShowRiskPopup(){
+  try{
+    if(!me||me.role!=='staff'||sessionStorage.getItem('anlinRiskStaffPopup'))return;
+    const data=await api('/api/community/risk-alerts?status=open&limit=4');
+    if(!data.items.length)return;
+    sessionStorage.setItem('anlinRiskStaffPopup','1');
+    const lines=data.items.map(a=>`${a.resident_name||('#'+a.resident_id)}：${RISK_METRICS[a.metric]||a.metric} ${a.value_text}（${a.level==='critical'?'需尽快关注':'关注'}）`);
+    await window.AnlinCore.confirmDialog('有 '+data.open_count+' 条未处理的风险预警：'+'\n· '+lines.join('\n· ')+(data.open_count>4?'\n…其余请在风险预警板块查看':'')+'\n\n以上来自常见参考范围，不构成医疗诊断。',{okLabel:'去处理',danger:data.items.some(a=>a.level==='critical')});
+    switchView('risk');
+  }catch(e){}
+}
+
 /* ---------- data-act 事件注册与原 oninput/overlay 绑定（CSP script-src 'self'） ---------- */
 window.AnlinCore.bindActions({
   'switch-view': ds => switchView(ds.view),
@@ -332,6 +397,12 @@ window.AnlinCore.bindActions({
   'disable-mfa': () => disableMFA(),
   'logout-all': () => logoutAllDevices(),
   'close-modal': () => closeModal(),
+  'ack-risk': ds => ackRisk(Number(ds.id)),
+  'page-risk': ds => {riskOffset=Math.max(0,riskOffset+Number(ds.step)*25);loadRiskView()},
+  'page-appt': ds => {apptOffset=Math.max(0,apptOffset+Number(ds.step)*25);loadAppointmentsView()},
+  'appt-confirm': ds => apptAction(Number(ds.id),'confirm','确认',true),
+  'appt-complete': ds => apptAction(Number(ds.id),'complete','完成',false),
+  'appt-cancel': ds => apptAction(Number(ds.id),'cancel','取消',false),
 });
 window.AnlinCore.bindInputActions({
   'search-residents': v => searchResidents(v),
@@ -342,6 +413,20 @@ window.AnlinCore.bindInputActions({
   if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) closeModal() });
   const form = document.querySelector('.login-shade form');
   if (form) form.addEventListener('submit', e => { e.preventDefault(); login() });
+  // keyboard access for the data-act nav items (replaces removed inline onkeydown)
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target instanceof Element ? e.target.closest('[data-act="switch-view"]') : null;
+    if (!el) return;
+    e.preventDefault();
+    switchView(el.dataset.view);
+  });
+  for (const [id, handler] of [['riskLevel', () => {riskOffset=0;loadRiskView()}],
+                               ['riskStatus', () => {riskOffset=0;loadRiskView()}],
+                               ['apptStatus', () => {apptOffset=0;loadAppointmentsView()}]]) {
+    const el = $(id);
+    if (el) el.addEventListener('change', handler);
+  }
 })();
 // expose for tests and sibling modules that reach the shared runtime via window
 Object.assign(window, {api, notify});

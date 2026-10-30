@@ -72,6 +72,7 @@ async function enterApp(){
       renderHome();renderVitals();
     }
     tab(me.role==='family'?'v-family':'v-home');
+    maybeShowRiskPopup();
   }catch(e){toast(e.message)}
 }
 function buildTabs(tabs){
@@ -85,8 +86,10 @@ function tab(v){
   if(v==='v-quiz')renderQuiz();
   if(v==='v-remind'){renderReminders();if(resident&&me.role==='resident')window.AnlinPlans?.mount($('healthPlans'),{residentId:resident.id,request:api,notify:toast})}
   if(v==='v-me')renderMe();
+  if(v==='v-appoint')renderAppointments();
   if(v==='v-home')renderHome();
   if(v==='v-vitals')renderVitals();
+  if(v==='v-vitals'&&me?.role==='resident')loadRiskCard();
 }
 
 /* ---------- 首页 ---------- */
@@ -224,6 +227,66 @@ async function renderReminders(){
 }
 async function doneRemind(id){
   try{await api(`/api/residents/${resident.id}/reminders/${id}/complete`,'PATCH');renderReminders()}catch(e){toast(e.message)}
+}
+
+/* ---------- 风险提示与预约 ---------- */
+const RISK_METRICS={blood_pressure:'血压',blood_glucose:'血糖',weight:'体重'};
+async function loadRiskCard(){
+  if(me?.role!=='resident'||!resident)return;
+  const version=sessionVersion;
+  try{
+    const out=await api(`/api/residents/${resident.id}/risk-alerts?days=14`);
+    if(version!==sessionVersion)return;
+    const card=$('riskCard');
+    if(!out.items.length){card.classList.add('hidden');return}
+    card.classList.remove('hidden');
+    $('riskList').innerHTML=out.items.map(a=>`<div class="item"><span class="${a.level==='critical'?'tag-coral':'tag'} tag">${a.level==='critical'?'需尽快关注':'关注'}</span><div class="grow"><b>${esc(RISK_METRICS[a.metric]||a.metric)} · ${esc(a.value_text)}</b><div class="d">${esc(a.message)}</div><div class="d">${esc(fmtTime(a.created_at))}</div></div></div>`).join('');
+  }catch(e){}
+}
+async function renderAppointments(){
+  if(me?.role!=='resident'||!resident)return;
+  const version=sessionVersion;
+  if(!$('apDate').value)$('apDate').value=localDate();
+  try{
+    const list=await api(`/api/residents/${resident.id}/appointments`);
+    if(version!==sessionVersion)return;
+    const labels={pending:'待确认',confirmed:'已确认',completed:'已完成',cancelled:'已取消'};
+    $('apList').innerHTML=list.length?list.map(a=>`<div class="card"><div class="row"><div><b>${esc(a.kind_label)}</b><div class="d">${esc(a.preferred_date)} ${esc(a.time_slot_label)}${a.note?' · '+esc(a.note):''}</div>${a.response_note?`<div class="d">社区回复：${esc(a.response_note)}${a.handled_by?'（'+esc(a.handled_by)+'）':''}</div>`:''}</div><span class="${a.status==='confirmed'?'tag':a.status==='pending'?'tag-coral':'tag-grey'} tag">${labels[a.status]||a.status}</span></div>${a.status==='pending'||a.status==='confirmed'?`<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn btn-line btn-danger" style="height:38px;padding:0 14px;font-size:13px" data-act="cancel-appointment" data-id="${a.id}">取消预约</button></div>`:''}</div>`).join(''):'<div class="empty">还没有预约记录，从上面的表单提交第一次预约。</div>';
+  }catch(e){if(!me)return;$('apList').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+}
+async function submitAppointment(){
+  if(me?.role!=='resident'||!resident)return;
+  const body={kind:$('apKind').value,preferred_date:$('apDate').value,time_slot:$('apSlot').value,note:$('apNote').value.trim()||null};
+  if(!body.preferred_date)return toast('请选择希望日期');
+  const btn=$('apSubmit');if(btn.disabled)return;btn.disabled=true;
+  try{await api(`/api/residents/${resident.id}/appointments`,'POST',body);$('apNote').value='';toast('预约已提交，等待社区确认');renderAppointments()}catch(e){toast(e.message)}finally{btn.disabled=false}
+}
+async function cancelAppointment(id){
+  if(!(await window.AnlinCore.confirmDialog('取消这个预约？')))return;
+  try{await api(`/api/residents/${resident.id}/appointments/${id}/cancel`,'POST');toast('已取消');renderAppointments()}catch(e){toast(e.message)}
+}
+/* 登录后检查近 72 小时的风险提示，弹一次窗口（居民本人与获授权家属）。 */
+async function maybeShowRiskPopup(){
+  try{
+    if(sessionStorage.getItem('anlinRiskPopup'))return;
+    let lines=[];
+    if(me.role==='resident'&&resident){
+      const out=await api(`/api/residents/${resident.id}/risk-alerts?days=3`);
+      lines=out.items.map(a=>`${RISK_METRICS[a.metric]||a.metric} ${a.value_text}（${a.level==='critical'?'需尽快关注':'关注'}）`);
+    }else if(me.role==='family'){
+      const shared=await api('/api/family/shared-residents');
+      for(const r of shared.slice(0,5)){
+        if(!r.can_vitals)continue;
+        try{const out=await api(`/api/residents/${r.resident_id}/risk-alerts?days=3`);
+          for(const a of out.items)lines.push(`${r.name}：${RISK_METRICS[a.metric]||a.metric} ${a.value_text}（${a.level==='critical'?'需尽快关注':'关注'}）`);
+        }catch(e){}
+      }
+    }
+    if(lines.length){
+      sessionStorage.setItem('anlinRiskPopup','1');
+      await window.AnlinCore.confirmDialog('近期的健康风险提示：\n· '+lines.slice(0,4).join('\n· ')+(lines.length>4?`\n…共 ${lines.length} 条，详情见健康页`:'')+'\n\n以上来自常见参考范围，不构成医疗诊断；如感不适应及时就医。',{okLabel:'知道了',danger:lines.some(l=>l.includes('需尽快关注'))});
+    }
+  }catch(e){}
 }
 
 /* ---------- 我的 / 家人共享 ---------- */
@@ -386,6 +449,7 @@ $('remAdd').onclick=async()=>{
 $('pwBtn').onclick=changePassword;
 $('claimBtn').onclick=submitClaim;
 $('consentBtn').onclick=toggleConsent;
+$('apSubmit').onclick=submitAppointment;
 $('logoutAll').onclick=async()=>{
   if(!(await window.AnlinCore.confirmDialog('退出所有设备？')))return;
   try{await api('/api/auth/logout-all','POST')}catch(e){}
@@ -395,7 +459,7 @@ $('logoutAll').onclick=async()=>{
 /* ---------- 启动 ---------- */
 fetch('/api/auth/demo-status').then(r=>r.json()).then(s=>{if(s.enabled)$('demoHint').textContent='演示提示：本页可用工作人员开通的账号登录（开发环境示例见管理台）。'}).catch(()=>{});
 if(token){
-  api('/api/me').then(async u=>{me=u;sessionChanged();await enterApp()}).catch(()=>{});
+  api('/api/me').then(async u=>{me=u;sessionChanged();await enterApp();maybeShowRiskPopup()}).catch(()=>{});
 }else{
   showLogin();
 }
@@ -420,6 +484,7 @@ window.AnlinCore.bindActions({
   'page-vitals': ds => pageVitals(Number(ds.step)),
   'open-quiz': ds => openQuiz(Number(ds.id)),
   'done-remind': ds => doneRemind(Number(ds.id)),
+  'cancel-appointment': ds => cancelAppointment(Number(ds.id)),
   'copy-invite': () => copyInvite(),
   'rotate-invite': () => rotateInvite(),
   'prompt-edit': () => promptEdit(),

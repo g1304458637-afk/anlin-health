@@ -12,7 +12,7 @@ from sqlalchemy import text
 from .db import engine, Base
 from .config import settings, validate_settings
 from . import models  # noqa: F401 - registers mappings
-from .routes import auth, residents, vitals, questionnaires, reminders, family, visits, admin, reporting, assistant, reports, report_assistant, plans
+from .routes import auth, residents, vitals, questionnaires, reminders, family, visits, admin, reporting, assistant, reports, report_assistant, plans, risk_alerts, appointments
 
 
 @asynccontextmanager
@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
         await asyncio.gather(*workers, return_exceptions=True)
 
 
-app = FastAPI(title="社区健康管理 API（试点工程）", version="0.6.0", lifespan=lifespan,
+app = FastAPI(title="社区健康管理 API（试点工程）", version="0.8.0", lifespan=lifespan,
     description="供社区和居民使用的健康记录与日常关怀试点系统。非医疗诊断产品。")
 if settings.cors_origins:
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_credentials=False,
@@ -66,10 +66,20 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-for router in [auth.router, residents.router, vitals.router, questionnaires.router, reminders.router, family.router, visits.router, admin.router, reporting.router, assistant.router, reports.router, report_assistant.router, plans.router]:
+for router in [auth.router, residents.router, vitals.router, questionnaires.router, reminders.router, family.router, visits.router, admin.router, reporting.router, assistant.router, reports.router, report_assistant.router, plans.router, risk_alerts.router, appointments.router]:
     app.include_router(router)
 
-app.mount("/static", StaticFiles(directory=Path(__file__).resolve().parents[1] / "static"), name="static")
+class NoCacheStaticFiles(StaticFiles):
+    """Static assets carry an ETag; no-cache makes browsers revalidate so a
+    deploy never leaves users on a stale JS bundle (cheap 304 when unchanged)."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+app.mount("/static", NoCacheStaticFiles(directory=Path(__file__).resolve().parents[1] / "static"), name="static")
 
 
 @app.get("/", include_in_schema=False)
@@ -81,19 +91,23 @@ def index():
 def health():
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
-    return {"status": "ok", "service": "community-health", "version": "0.6.0"}
+    return {"status": "ok", "service": "community-health", "version": "0.8.0"}
 
 
 @app.get("/console", include_in_schema=False)
 def console():
-    return FileResponse(Path(__file__).resolve().parents[1] / "static" / "console.html")
+    # Page HTML must revalidate every load: it wires the external JS bundles.
+    return FileResponse(Path(__file__).resolve().parents[1] / "static" / "console.html",
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/app", include_in_schema=False)
 def portal():
-    return FileResponse(Path(__file__).resolve().parents[1] / "static" / "portal.html")
+    return FileResponse(Path(__file__).resolve().parents[1] / "static" / "portal.html",
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/help", include_in_schema=False)
 def help_page():
-    return FileResponse(Path(__file__).resolve().parents[1] / "static" / "help.html")
+    return FileResponse(Path(__file__).resolve().parents[1] / "static" / "help.html",
+                        headers={"Cache-Control": "no-store"})

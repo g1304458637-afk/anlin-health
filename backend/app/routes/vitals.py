@@ -81,7 +81,7 @@ def list_vitals(resident_id: int, metric: str | None = Query(default=None, patte
 
 @router.post("/residents/{resident_id}/vitals", response_model=VitalOut, status_code=201)
 def create_vital(resident_id: int, body: VitalIn, user: User = Depends(auth_user), db: Session = Depends(get_db)):
-    check_access(db, user, db.get(Resident, resident_id), scope="vitals", write=True)
+    resident = check_access(db, user, db.get(Resident, resident_id), scope="vitals", write=True)
     if body.measured_at is not None and body.measured_at.tzinfo is None:
         raise HTTPException(422, "测量时间必须包含时区")
     existing = _replay(db, user, resident_id, body)
@@ -98,6 +98,8 @@ def create_vital(resident_id: int, body: VitalIn, user: User = Depends(auth_user
     try:
         db.add(record)
         db.flush()
+        from ..risk_rules import raise_alerts
+        raise_alerts(db, resident, record, user)
         audit(db, user, "create_vital", "vital", record.id)
         db.commit()
     except IntegrityError:

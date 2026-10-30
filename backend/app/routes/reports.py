@@ -495,6 +495,8 @@ def confirm_report(report_id: int, body: ReportReview, response: Response,
                       **vital_in.model_dump(exclude={"measured_at"}), measured_at=vital_in.measured_at)
         db.add(vital)
         db.flush()
+        from ..risk_rules import raise_alerts
+        raise_alerts(db, resident, vital, user)
         db.add(ReportVitalLink(report_id=report.id, item_id=imp["item_id"], vital_id=vital.id,
                               imported_revision=report.revision,
                               imported_snapshot_json=json.dumps(_import_snapshot(review, imp["item_id"]), ensure_ascii=False)))

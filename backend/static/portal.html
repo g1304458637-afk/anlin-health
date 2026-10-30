@@ -4,18 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>安邻健康 · 居民服务</title>
-<link rel="stylesheet" href="/static/assistant.css">
-<link rel="stylesheet" href="/static/reports.css">
-<script defer src="/static/assistant.js"></script>
-<script defer src="/static/reports.js"></script>
-<link rel="stylesheet" href="/static/plans.css">
-<script defer src="/static/plans.js"></script>
-<script defer src="/static/trends.js"></script>
-<link rel="stylesheet" href="/static/care-theme.css">
-<link rel="stylesheet" href="/static/fonts/fonts.css">
-<link rel="stylesheet" href="/static/portal.css">
-<script defer src="/static/js/app-core.js"></script>
-<script defer src="/static/js/portal-app.js"></script>
+<link rel="stylesheet" href="/static/assistant.css?v=0.8.0">
+<link rel="stylesheet" href="/static/reports.css?v=0.8.0">
+<script defer src="/static/assistant.js?v=0.8.0"></script>
+<script defer src="/static/reports.js?v=0.8.0"></script>
+<link rel="stylesheet" href="/static/plans.css?v=0.8.0">
+<script defer src="/static/plans.js?v=0.8.0"></script>
+<script defer src="/static/trends.js?v=0.8.0"></script>
+<link rel="stylesheet" href="/static/care-theme.css?v=0.8.0">
+<link rel="stylesheet" href="/static/fonts/fonts.css?v=0.8.0">
+<link rel="stylesheet" href="/static/portal.css?v=0.8.0">
+<script defer src="/static/js/app-core.js?v=0.8.0"></script>
+<script defer src="/static/js/portal-app.js?v=0.8.0"></script>
 </head>
 <body class="resident-app">
 <div class="wrap">
@@ -76,6 +76,7 @@
             <button class="quick-action" type="button" data-act="tab" data-v="v-vitals"><span class="action-icon" data-icon="heart"></span><span><b>记一次测量</b><small>看见身体的变化</small></span></button>
             <button class="quick-action" type="button" data-act="tab" data-v="v-remind"><span class="action-icon" data-icon="calendar"></span><span><b>我的健康计划</b><small>把关心变成习惯</small></span></button>
             <button class="quick-action" type="button" id="homeReportBtn"><span class="action-icon" data-icon="file"></span><span><b>整理检查报告</b><small>每一份都有出处</small></span></button>
+            <button class="quick-action" type="button" data-act="tab" data-v="v-appoint"><span class="action-icon" data-icon="calendar"></span><span><b>预约服务</b><small>预约工作人员或医生陪同</small></span></button>
           </div>
           <div class="home-lower">
             <div class="card"><div class="card-title-row"><h3>今天的小安排</h3><button class="text-button" data-act="tab" data-v="v-remind">查看全部 →</button></div><div id="homeReminders"></div></div>
@@ -93,6 +94,7 @@
           <div class="card"><h3 id="vtFormTitle">记录血压</h3><div id="vtFields"></div><div class="field"><label for="vtMeasuredAt">实际测量时间</label><input id="vtMeasuredAt" type="datetime-local" required></div><p class="helper" style="margin:0 0 16px">可补录之前的测量，请按实际发生时间填写。</p><button class="btn btn-primary" id="vtSave" type="button">保存这次测量</button><div class="helper" id="vitalSaveState" aria-live="polite"></div></div>
           <div class="card"><div class="card-title-row"><h3>变化趋势</h3><div class="range-tabs" id="trendRanges"><button type="button" data-days="7" data-act="trend-range" data-days="7">7 天</button><button type="button" class="on" data-days="30" data-act="trend-range" data-days="30">30 天</button><button type="button" data-days="90" data-act="trend-range" data-days="90">90 天</button></div></div><div id="vtTrend"></div></div>
         </div>
+        <div class="card hidden" id="riskCard"><div class="card-title-row"><h3>近期风险提示</h3><span class="helper" style="margin:0">来自常见参考范围 · 非诊断</span></div><div id="riskList"></div></div>
         <div class="card"><div class="card-title-row"><h3>历史记录</h3><span class="helper" style="margin:0">按实际测量时间排列</span></div><div id="vtList"></div><div id="vtPaging" class="row" style="justify-content:flex-end;gap:8px;margin-top:12px"></div></div>
       </section>
 
@@ -116,6 +118,22 @@
             <button class="btn btn-primary" id="remAdd" type="button" style="margin-top:12px">添加提醒</button>
           </div>
         </div>
+      </section>
+
+      <!-- 预约 -->
+      <section class="view" id="v-appoint"><div class="page-heading"><div><div class="page-kicker">CARE, ON YOUR SCHEDULE</div><h2>预约服务</h2><p>预约社区工作人员上门，或请人陪同去看医生。</p></div></div>
+        <div class="card">
+          <div class="field"><label for="apKind">预约类型</label><select id="apKind"><option value="staff">社区工作人员上门</option><option value="doctor">医生门诊陪同</option></select></div>
+          <div class="row" style="gap:10px">
+            <div class="field" style="flex:1;margin:0"><label for="apDate">希望日期</label><input id="apDate" type="date"></div>
+            <div class="field" style="flex:1;margin:0"><label for="apSlot">时段</label><select id="apSlot"><option value="morning">上午</option><option value="afternoon">下午</option></select></div>
+          </div>
+          <div class="field"><label for="apNote">想说明的事（选填）</label><input id="apNote" maxlength="300" placeholder="例如：复诊陪同、帮忙量血压"></div>
+          <button class="btn btn-primary" id="apSubmit" type="button" style="margin-top:12px">提交预约</button>
+          <div class="helper">提交后由社区工作人员确认，确认结果会显示在下方。</div>
+        </div>
+        <div class="sect">我的预约记录</div>
+        <div id="apList"></div>
       </section>
 
       <!-- 家人（家属角色） -->

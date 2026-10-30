@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone, date
 from sqlalchemy import select
 from .db import SessionLocal, Base, engine
 from .config import settings
-from .models import User, Community, Resident, ConsentEvent, Vital, Reminder, Questionnaire, Visit
+from .models import User, Community, Resident, ConsentEvent, Vital, Reminder, Questionnaire, Visit, RiskAlert, Appointment
 from .security import hash_password, new_invite_code
 
 SAMPLE_QS = [
@@ -54,6 +54,17 @@ def seed():
         db.add(Visit(resident_id=r2.id, staff_id=staff.id, due_date=date.today()+timedelta(days=1), status="planned"))
         for template in SAMPLE_QS:
             db.add(Questionnaire(version=1, published=True, **template))
+        # Demo surfaces for the risk-notice queue and the appointment board.
+        high = Vital(resident_id=r1.id, actor_id=resident_user.id, type="blood_pressure",
+                     systolic=168, diastolic=102,
+                     measured_at=datetime.now(timezone.utc)-timedelta(hours=3))
+        db.add(high); db.flush()
+        db.add(RiskAlert(resident_id=r1.id, vital_id=high.id, metric="blood_pressure", level="critical",
+            value_text="168/102 mmHg",
+            message="本次血压 168/102 mmHg 高于常见关注范围（≥140/90），建议按平时习惯复测并留意变化。本提示来自常见参考范围，不构成医疗诊断。"))
+        db.add(Appointment(resident_id=r1.id, requester_id=resident_user.id, kind="doctor",
+            preferred_date=date.today()+timedelta(days=2), time_slot="morning",
+            note="想请人陪同去社区卫生服务中心复诊", status="pending"))
         db.commit()
     print("Demo data seeded. Accounts: staff/staff2/resident/family/admin; password: DemoPass2026!")
 

@@ -1,0 +1,77 @@
+"""Risk notice surfaces: resident/family per-resident history and the staff console queue."""
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from ..db import get_db
+from ..deps import audit, auth_user, check_access, require_roles
+from ..models import Resident, RiskAlert, User
+from ..reporting import visible_resident_ids
+
+router = APIRouter(prefix="/api", tags=["risk alerts"])
+
+
+def _out(alert: RiskAlert, resident: Resident | None) -> dict:
+    return {"id": alert.id, "resident_id": alert.resident_id,
+            "resident_name": resident.name if resident else None,
+            "vital_id": alert.vital_id, "metric": alert.metric, "level": alert.level,
+            "value_text": alert.value_text, "message": alert.message,
+            "acknowledged_at": alert.acknowledged_at, "created_at": alert.created_at}
+
+
+@router.get("/residents/{resident_id}/risk-alerts")
+def resident_risk_alerts(resident_id: int, response: Response,
+                         days: int = Query(default=30, ge=1, le=90),
+                         user: User = Depends(auth_user), db: Session = Depends(get_db)):
+    """Alert history for one resident. The resident themself, staff with valid
+    consent, and family with an active vitals grant (via check_access scope)."""
+    response.headers["Cache-Control"] = "no-store"
+    check_access(db, user, db.get(Resident, resident_id), scope="vitals")
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    rows = db.scalars(select(RiskAlert).where(RiskAlert.resident_id == resident_id,
+                                              RiskAlert.created_at >= cutoff)
+                      .order_by(RiskAlert.created_at.desc(), RiskAlert.id.desc()).limit(100)).all()
+    return {"items": [_out(a, db.get(Resident, resident_id)) for a in rows]}
+
+
+@router.get("/community/risk-alerts")
+def community_risk_alerts(response: Response, level: str | None = Query(None, pattern="^(warning|critical)$"),
+                          status: str = Query(default="open", pattern="^(open|acknowledged|all)$"),
+                          limit: int = Query(default=50, ge=1, le=200), offset: int = Query(default=0, ge=0),
+                          user: User = Depends(require_roles("staff")), db: Session = Depends(get_db)):
+    """Console queue: alerts for this community's residents with valid consent."""
+    response.headers["Cache-Control"] = "no-store"
+    visible = visible_resident_ids(user.community_id)
+    query = select(RiskAlert).where(RiskAlert.resident_id.in_(visible))
+    if level:
+        query = query.where(RiskAlert.level == level)
+    if status == "open":
+        query = query.where(RiskAlert.acknowledged_at.is_(None))
+    elif status == "acknowledged":
+        query = query.where(RiskAlert.acknowledged_at.is_not(None))
+    rows = db.scalars(query.order_by(RiskAlert.acknowledged_at.is_not(None),
+                                     RiskAlert.level.is_("warning"),  # critical first
+                                     RiskAlert.created_at.desc(), RiskAlert.id.desc())
+                      .offset(offset).limit(limit)).all()
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    open_count = db.scalar(select(func.count()).select_from(
+        select(RiskAlert).where(RiskAlert.resident_id.in_(visible), RiskAlert.acknowledged_at.is_(None)).subquery())) or 0
+    return {"items": [_out(a, db.get(Resident, a.resident_id)) for a in rows],
+            "total": total, "open_count": open_count, "limit": limit, "offset": offset}
+
+
+@router.post("/community/risk-alerts/{alert_id}/ack")
+def acknowledge_alert(alert_id: int, user: User = Depends(require_roles("staff")),
+                      db: Session = Depends(get_db)):
+    alert = db.get(RiskAlert, alert_id)
+    resident = db.get(Resident, alert.resident_id) if alert else None
+    if not alert or not resident or resident.community_id != user.community_id:
+        raise HTTPException(404, "预警不存在")
+    if alert.acknowledged_at is None:
+        alert.acknowledged_at = datetime.now(timezone.utc)
+        alert.acknowledged_by_id = user.id
+        audit(db, user, "risk_alert_acknowledged", "risk_alert", alert.id)
+        db.commit()
+    return {"ok": True}
