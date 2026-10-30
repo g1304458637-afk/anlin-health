@@ -80,9 +80,12 @@ def raise_alerts(db: Session, resident: Resident, vital: Vital, actor: object) -
     created = []
     for finding in evaluate_vital(db, vital):
         recent_cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        # Dedup only against still-open alerts: once staff acknowledged one,
+        # a NEW out-of-range reading must raise a fresh alert.
         duplicate = db.scalar(select(RiskAlert.id).where(
             RiskAlert.resident_id == resident.id, RiskAlert.metric == finding["metric"],
-            RiskAlert.level == finding["level"], RiskAlert.created_at > recent_cutoff))
+            RiskAlert.level == finding["level"], RiskAlert.acknowledged_at.is_(None),
+            RiskAlert.created_at > recent_cutoff))
         if duplicate:
             continue
         alert = RiskAlert(resident_id=resident.id, vital_id=vital.id,

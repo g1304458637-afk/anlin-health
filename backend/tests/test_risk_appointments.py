@@ -26,6 +26,15 @@ def test_critical_and_warning_thresholds_raise_alerts(client, token, db):
     assert warn.status_code == 201
     levels = {a.level for a in db.query(RiskAlert).filter(RiskAlert.metric == "blood_pressure").all()}
     assert levels == {"critical", "warning"}
+    # After staff acknowledge the critical alert, a new critical reading re-alerts.
+    from datetime import datetime, timezone
+    first = db.query(RiskAlert).filter(RiskAlert.level == "critical").one()
+    first.acknowledged_at = datetime.now(timezone.utc)
+    db.commit()
+    third = _vital(client, token, type="blood_pressure", systolic=188, diastolic=105, client_request_id="risk-crit-0003")
+    assert third.status_code == 201
+    criticals = db.query(RiskAlert).filter(RiskAlert.level == "critical").count()
+    assert criticals == 2
 
 
 def test_glucose_low_and_weight_delta_rules(client, token, db):
