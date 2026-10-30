@@ -3,16 +3,18 @@ import csv
 import io
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import audit, auth_user, check_access
+from ..ratelimit import SlidingWindowLimiter
 from ..models import Appointment, Resident, RiskAlert, User, Vital
 
 router = APIRouter(prefix="/api", tags=["resident summary"])
+_export_limiter = SlidingWindowLimiter("csv-export")
 
 
 def _since(days: int) -> datetime:
@@ -71,8 +73,10 @@ def export_csv(resident_id: int, response: Response,
     so Excel opens Chinese columns correctly). Owner-only."""
     resident = db.get(Resident, resident_id)
     if not resident or resident.owner_user_id != user.id:
-        from fastapi import HTTPException
         raise HTTPException(404, "仅档案本人可导出数据")
+    from ..config import env_int
+    if not _export_limiter.hit(f"export:{user.id}", env_int("EXPORT_RATE_PER_HOUR", 5), 3600):
+        raise HTTPException(429, "导出过于频繁，请稍后再试")
     rows = db.scalars(select(Vital).where(
         Vital.resident_id == resident_id, Vital.deleted_at.is_(None))
         .order_by(Vital.measured_at)).all()

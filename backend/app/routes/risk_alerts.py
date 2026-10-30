@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import audit, auth_user, check_access, require_roles
+from ..deps import audit, auth_user, check_access, consent_active, require_roles
 from ..models import Resident, RiskAlert, User, Visit
 from ..reporting import visible_resident_ids
 
@@ -104,6 +104,10 @@ def alert_to_visit(alert_id: int, user: User = Depends(require_roles("staff")), 
     alert = _open_alert_for_staff(db, alert_id, user)
     if alert.acknowledged_at is not None:
         raise HTTPException(409, "该预警已处理，可直接在入户随访中新建任务")
+    # The task note carries health values; creating it requires valid consent,
+    # same as every other staff write on the resident's record.
+    if not consent_active(db, alert.resident_id):
+        raise HTTPException(409, "该居民的社区服务授权未生效，暂不能生成随访任务")
     existing = db.scalar(select(Visit.id).where(
         Visit.resident_id == alert.resident_id, Visit.status == "planned", Visit.staff_id == user.id,
         Visit.note.like(f"[风险预警 #{alert.id}]%")))

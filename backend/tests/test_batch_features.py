@@ -46,6 +46,14 @@ def test_alert_to_visit_creates_single_task(client, token, db):
     assert visit.status == "planned" and f"[风险预警 #{alert_id}]" in visit.note
     dup = client.post(f"/api/community/risk-alerts/{alert_id}/to-visit", headers=token("staff"))
     assert dup.status_code == 409
+    # Withdrawn consent blocks creating the task (the note carries health values).
+    client.post("/api/residents/1/consents", headers=token("resident"), json={"granted": False})
+    fresh = _bp(client, token, 186, 100, "to-visit-0002")
+    assert fresh.status_code == 201
+    alert2 = db.query(RiskAlert).filter(RiskAlert.acknowledged_at.is_(None),
+                                        RiskAlert.metric == "blood_pressure").order_by(RiskAlert.id.desc()).first()
+    blocked = client.post(f"/api/community/risk-alerts/{alert2.id}/to-visit", headers=token("staff"))
+    assert blocked.status_code == 409 and "授权未生效" in blocked.json()["detail"]
 
 
 def test_trend_alert_after_three_rising_elevated_readings(client, token, db):
@@ -163,3 +171,9 @@ def test_weekly_report_and_csv_export(client, token, db):
     # Not exportable by family (owner-only) or other-community staff.
     assert client.get("/api/residents/1/export.csv", headers=token("family")).status_code == 404
     assert client.get("/api/residents/1/export.csv", headers=token("staff2")).status_code == 404
+    # Rate limited for the owner as well.
+    from app.routes.summary import _export_limiter
+    _export_limiter.reset()
+    for _ in range(5):
+        assert client.get("/api/residents/1/export.csv", headers=token("resident")).status_code == 200
+    assert client.get("/api/residents/1/export.csv", headers=token("resident")).status_code == 429
