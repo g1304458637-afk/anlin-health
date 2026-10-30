@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
-let token=sessionStorage.getItem('token')||'', me=null, resident=null, communities=[], quizState=null, vtType='blood_pressure', vitalOffset=0;
+let token=sessionStorage.getItem('token')||'', me=null, resident=null, communities=[], vtType='blood_pressure', vitalOffset=0;
 let sessionVersion=0, trendDays=30, trendRequestSeq=0, vitalRequestSeq=0, pendingVital=null;
 window.anlinAssistantAuth=()=>({token,user:me});
 function sessionChanged(){sessionVersion++;trendRequestSeq++;vitalRequestSeq++;pendingVital=null;window.AnlinPlans?.reset();window.dispatchEvent(new CustomEvent('anlin-session-change'))}
@@ -46,11 +46,11 @@ async function registerFamily(){
 }
 function showLogin(){
   $('loginView').classList.remove('hidden');$('appView').classList.add('hidden');
-  me=null;resident=null;communities=[];quizState=null;vtType='blood_pressure';vitalOffset=0;trendDays=30;pendingVital=null;
-  for(const id of ['whoami','tabbar','obComm','homeArchive','homeReminders','homeLatest','healthPlans','vitalSaveState','vtTabs','vtFields','vtTrend','vtList','vtPaging','quizList','quizForm','quizMine','remList','meProfile','meShare','famList','famDetail','claimStatus','consentState','consentHistory'])$(id).replaceChildren();
+  me=null;resident=null;communities=[];vtType='blood_pressure';vitalOffset=0;trendDays=30;pendingVital=null;
+  for(const id of ['whoami','tabbar','obComm','homeArchive','homeReminders','homeLatest','healthPlans','vitalSaveState','vtTabs','vtFields','vtTrend','vtList','vtPaging','remList','meProfile','meShare','famList','famDetail','claimStatus','consentState','consentHistory'])$(id).replaceChildren();
   for(const id of ['luser','lpwd','ruser','rname','rpwd','pwCur','pwNew','gCode','claimId','claimName','claimPhone','claimNote','obName','obYear','remTitle','remDate','vtMeasuredAt']){const el=$(id);if(el)el.value=''}
   $('obConsent').checked=false;$('regBox').classList.add('hidden');$('claimCard').classList.add('hidden');$('consentCard').classList.add('hidden');
-  $('quizForm').classList.add('hidden');$('quizList').classList.remove('hidden');$('famDetail').classList.add('hidden');$('famList').classList.remove('hidden');
+  $('famDetail').classList.add('hidden');$('famList').classList.remove('hidden');
   $('toast').textContent='';$('toast').classList.add('hidden');
   document.querySelectorAll('main .view').forEach(x=>x.classList.remove('on'));
 }
@@ -64,7 +64,7 @@ async function enterApp(){
   $('whoami').textContent=(me.display_name||me.username)+' · '+(me.role==='family'?'家属':'居民');
   try{
     if(me.role==='family'){buildTabs([['v-family','家人','👥'],['v-me','我的','🙂']]);renderFamilyList()}
-    else{buildTabs([['v-home','首页','🏠'],['v-vitals','健康','❤️'],['v-quiz','问卷','📋'],['v-remind','提醒','⏰'],['v-me','我的','🙂']])}
+    else{buildTabs([['v-home','首页','🏠'],['v-vitals','健康','❤️'],['v-appoint','预约','📅'],['v-remind','提醒','⏰'],['v-me','我的','🙂']])}
     if(me.role!=='family'){
       const loadedCommunities=await api('/api/communities');if(version!==sessionVersion)return;communities=loadedCommunities;
       $('obComm').innerHTML=communities.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
@@ -76,14 +76,13 @@ async function enterApp(){
   }catch(e){toast(e.message)}
 }
 function buildTabs(tabs){
-  $('tabbar').innerHTML=tabs.map(t=>`<button data-v="${t[0]}" data-act="tab"><span class="ico">${icon({'v-home':'home','v-vitals':'heart','v-quiz':'file','v-remind':'calendar','v-me':'user','v-family':'users'}[t[0]])}</span>${t[0]==='v-remind'?'计划':t[1]}</button>`).join('');
+  $('tabbar').innerHTML=tabs.map(t=>`<button data-v="${t[0]}" data-act="tab"><span class="ico">${icon({'v-home':'home','v-vitals':'heart','v-appoint':'calendar','v-remind':'calendar','v-me':'user','v-family':'users'}[t[0]])}</span>${t[0]==='v-remind'?'计划':t[1]}</button>`).join('');
 }
 function tab(v){
   if(!me)return;
   document.querySelectorAll('main .view').forEach(x=>x.classList.remove('on'));
   const el=$(v);if(el)el.classList.add('on');
   document.querySelectorAll('#tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  if(v==='v-quiz')renderQuiz();
   if(v==='v-remind'){renderReminders();if(resident&&me.role==='resident')window.AnlinPlans?.mount($('healthPlans'),{residentId:resident.id,request:api,notify:toast})}
   if(v==='v-me')renderMe();
   if(v==='v-appoint')renderAppointments();
@@ -175,43 +174,6 @@ async function saveVital(){
 async function delVital(id){
   if(!(await window.AnlinCore.confirmDialog('删除这条记录？删除后无法找回。')))return;
   try{await api(`/api/residents/${resident.id}/vitals/${id}`,'DELETE');toast('已删除');loadVitals();loadTrend()}catch(e){toast(e.message)}
-}
-
-/* ---------- 问卷 ---------- */
-async function renderQuiz(){
-  if(me.role==='family'||!resident)return;
-  const version=sessionVersion;
-  try{
-    const qs=await api('/api/questionnaires');
-    if(version!==sessionVersion)return;
-    $('quizList').innerHTML=qs.map(q=>`<div class="card"><div class="row"><div><b>${esc(q.title)}</b><div class="d" style="color:var(--muted);font-size:13px;margin-top:4px">${q.questions.length} 道题 · ${q.category==='wellbeing'?'仅本人可见':'日常记录'}</div></div><button class="btn btn-line" data-act="open-quiz" data-id="${q.id}">去填写</button></div></div>`).join('');
-    const mine=await api(`/api/residents/${resident.id}/responses`);
-    if(version!==sessionVersion)return;
-    $('quizMine').innerHTML=mine.length?mine.slice(0,10).map(r=>`<div class="item"><div class="grow"><b>${esc((qs.find(q=>q.id===r.questionnaire_id)||{}).title||'问卷 #'+r.questionnaire_id)}</b><div class="d">${fmtD(r.created_at)} · 版本 v${r.questionnaire_version}</div></div></div>`).join(''):'<div class="empty">还没有作答记录</div>';
-  }catch(e){if(!me)return;$('quizList').innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
-}
-async function openQuiz(id){
-  try{
-    const q=(await api('/api/questionnaires')).find(x=>x.id===id);
-    quizState=q;
-    $('quizList').classList.add('hidden');
-    const box=$('quizForm');box.classList.remove('hidden');
-    box.innerHTML=`<div class="card"><h3>${esc(q.title)}</h3>${q.category==='wellbeing'?'<div class="helper">此问卷仅您本人可见，家人和社区都看不到内容。</div>':''}${q.questions.map((item,i)=>`<div class="sect">${i+1}. ${esc(item.text)}</div><div class="opts">${item.options.map(o=>`<label><input type="radio" name="q_${item.id}" value="${esc(o.value)}"><span>${esc(o.label)}</span></label>`).join('')}</div>`).join('')}<button class="btn btn-primary" id="quizSubmit" type="button" style="margin-top:16px">提交问卷</button> <button class="btn btn-line" id="quizBack" type="button" style="margin-top:16px">返回</button></div>`;
-    $('quizSubmit').onclick=submitQuiz;$('quizBack').onclick=()=>{box.classList.add('hidden');$('quizList').classList.remove('hidden')};
-    window.scrollTo({top:0});
-  }catch(e){toast(e.message)}
-}
-async function submitQuiz(){
-  const answers={};
-  for(const item of quizState.questions){
-    const sel=document.querySelector(`input[name="q_${item.id}"]:checked`);
-    if(!sel)return toast('还有题目没作答哦');
-    answers[item.id]=sel.value;
-  }
-  try{
-    await api(`/api/residents/${resident.id}/responses`,'POST',{questionnaire_id:quizState.id,answers});
-    toast('提交成功，感谢您的记录');$('quizForm').classList.add('hidden');$('quizList').classList.remove('hidden');renderQuiz();
-  }catch(e){toast(e.message)}
 }
 
 /* ---------- 提醒 ---------- */
@@ -471,7 +433,7 @@ $('homeReportBtn').addEventListener('click',()=>{if(me?.role==='resident'&&resid
 Object.assign(window, {api, toast});
 window.setTrendRange=setTrendRange;
 window.tab=tab;window.setVT=setVT;window.pageVitals=pageVitals;window.saveVital=saveVital;window.delVital=delVital;
-window.openQuiz=openQuiz;window.doneRemind=doneRemind;window.promptEdit=promptEdit;
+window.doneRemind=doneRemind;window.promptEdit=promptEdit;
 window.copyInvite=copyInvite;window.rotateInvite=rotateInvite;window.revokeGrant=revokeGrant;
 window.renderFamilyList=renderFamilyList;window.openFam=openFam;window.declineGrant=declineGrant;
 
@@ -482,7 +444,6 @@ window.AnlinCore.bindActions({
   'set-vt': ds => setVT(ds.metric),
   'del-vital': ds => delVital(Number(ds.id)),
   'page-vitals': ds => pageVitals(Number(ds.step)),
-  'open-quiz': ds => openQuiz(Number(ds.id)),
   'done-remind': ds => doneRemind(Number(ds.id)),
   'cancel-appointment': ds => cancelAppointment(Number(ds.id)),
   'copy-invite': () => copyInvite(),

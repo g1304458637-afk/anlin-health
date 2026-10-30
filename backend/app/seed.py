@@ -50,7 +50,7 @@ def seed():
                 diastolic=diastolic, measured_at=datetime.now(timezone.utc)-timedelta(days=days)))
         db.add(Vital(resident_id=r2.id, actor_id=staff.id, type="blood_glucose", glucose_mmol_l=5.8))
         db.add(Reminder(resident_id=r1.id, actor_id=resident_user.id, type="measure", title="记录今天的血压", due_date=date.today()))
-        db.add(Reminder(resident_id=r1.id, actor_id=resident_user.id, type="questionnaire", title="完成一份健康习惯问卷", due_date=date.today()+timedelta(days=1)))
+        db.add(Reminder(resident_id=r1.id, actor_id=resident_user.id, type="followup", title="看看预约是否有社区回复", due_date=date.today()+timedelta(days=1)))
         db.add(Visit(resident_id=r2.id, staff_id=staff.id, due_date=date.today()+timedelta(days=1), status="planned"))
         for template in SAMPLE_QS:
             db.add(Questionnaire(version=1, published=True, **template))

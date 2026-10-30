@@ -98,21 +98,13 @@
         <div class="card"><div class="card-title-row"><h3>历史记录</h3><span class="helper" style="margin:0">按实际测量时间排列</span></div><div id="vtList"></div><div id="vtPaging" class="row" style="justify-content:flex-end;gap:8px;margin-top:12px"></div></div>
       </section>
 
-      <!-- 问卷 -->
-      <section class="view" id="v-quiz"><div class="page-heading"><div><div class="page-kicker">A MOMENT FOR YOURSELF</div><h2>关心一下，最近的自己</h2><p>记录生活习惯与心情，答案仅自己可见。</p></div></div>
-        <div id="quizList"></div>
-        <div id="quizForm" class="hidden"></div>
-        <div class="sect">我的作答记录</div>
-        <div class="card" id="quizMine"></div>
-      </section>
-
       <!-- 提醒 -->
       <section class="view" id="v-remind"><div class="page-heading"><div><div class="page-kicker">SMALL STEPS, EVERY DAY</div><h2>我的健康计划</h2><p>安排好每天的小事，也给自己留一点从容。</p></div></div><div id="healthPlans"></div><div class="sect">临时安排 · 单次提醒</div>
         <div class="card"><div id="remList"></div>
           <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:14px">
             <div class="field"><label for="remTitle">新提醒事项</label><input id="remTitle" placeholder="例如：上午量血压" maxlength="60"></div>
             <div class="row" style="gap:10px">
-              <div class="field" style="flex:1;margin:0"><label for="remType">类型</label><select id="remType"><option value="measure">测量</option><option value="questionnaire">问卷</option><option value="followup">随访</option></select></div>
+              <div class="field" style="flex:1;margin:0"><label for="remType">类型</label><select id="remType"><option value="measure">测量</option><option value="followup">随访</option></select></div>
               <div class="field" style="flex:1;margin:0"><label for="remDate">日期</label><input id="remDate" type="date"></div>
             </div>
             <button class="btn btn-primary" id="remAdd" type="button" style="margin-top:12px">添加提醒</button>
