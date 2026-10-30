@@ -49,6 +49,8 @@ def vital_series(resident_id: int, metric: str = Query(pattern="^(blood_pressure
     records = db.scalars(select(Vital).where(Vital.resident_id == resident_id, Vital.type == metric,
         Vital.deleted_at.is_(None),
         Vital.measured_at >= start, Vital.measured_at < end).order_by(Vital.measured_at, Vital.id).limit(5001)).all()
+    actor_names = {u.id: u.display_name for u in db.scalars(select(User).where(
+        User.id.in_({r.actor_id for r in records} or {0}))).all()}
     if len(records) > 5000:
         raise HTTPException(422, "这段时间的记录超过5000条，请缩小日期范围后查看完整趋势")
     from ..report_models import ReportVitalLink
@@ -61,6 +63,7 @@ def vital_series(resident_id: int, metric: str = Query(pattern="^(blood_pressure
         point["created_at"] = _as_utc(row.created_at).isoformat()
         link = links.get(row.id)
         point["source"] = "report" if link else "manual"
+        point["recorded_by"] = actor_names.get(row.actor_id)
         if user.role != "family":
             point["report_id"] = link.report_id if link else None
             point["source_needs_review"] = bool(getattr(link, "needs_review", False)) if link else False
@@ -76,7 +79,15 @@ def list_vitals(resident_id: int, metric: str | None = Query(default=None, patte
     query = select(Vital).where(Vital.resident_id == resident_id, Vital.deleted_at.is_(None))
     if metric:
         query = query.where(Vital.type == metric)
-    return db.scalars(query.order_by(Vital.measured_at.desc(), Vital.id.desc()).offset(offset).limit(limit)).all()
+    rows = db.scalars(query.order_by(Vital.measured_at.desc(), Vital.id.desc()).offset(offset).limit(limit)).all()
+    actor_names = {u.id: u.display_name for u in db.scalars(select(User).where(
+        User.id.in_({r.actor_id for r in rows} or {0}))).all()}
+    result = []
+    for row in rows:
+        item = VitalOut.model_validate(row).model_dump(mode="json")
+        item["recorded_by"] = actor_names.get(row.actor_id)
+        result.append(item)
+    return result
 
 
 @router.post("/residents/{resident_id}/vitals", response_model=VitalOut, status_code=201)

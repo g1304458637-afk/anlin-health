@@ -56,6 +56,9 @@ class Resident(Base):
     sex: Mapped[str] = mapped_column(String(12), default="undisclosed")
     # Encrypted at rest when FIELD_ENCRYPTION_KEY is configured.
     phone: Mapped[str | None] = mapped_column(EncryptedString(200), nullable=True)
+    # Per-resident alert-threshold overrides, staff-set; JSON like
+    # {"blood_pressure": {"warning_sys": 130, ...}}. Missing keys fall back to defaults.
+    alert_overrides: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -101,6 +104,8 @@ class FamilyGrant(Base):
     grantee_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     can_profile: Mapped[bool] = mapped_column(Boolean, default=True)
     can_vitals: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Family may enter readings on the resident's behalf (audit marks proxy entries).
+    can_write_vitals: Mapped[bool] = mapped_column(Boolean, default=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -211,6 +216,9 @@ class RiskAlert(Base):
     message: Mapped[str] = mapped_column(String(300))
     acknowledged_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Closed-loop handling: how staff responded (called/visited/referred/no_action) + note.
+    outcome: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    outcome_note: Mapped[str | None] = mapped_column(String(300), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

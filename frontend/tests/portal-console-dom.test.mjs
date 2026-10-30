@@ -33,6 +33,7 @@ function harness(name, route, initialStorage = {}) {
     console, setTimeout, clearTimeout, AbortSignal, Date, Promise, Element: class {},
     document: {getElementById: element, querySelectorAll: () => [], querySelector: () => null, addEventListener: () => {}},
     sessionStorage: {getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k)},
+    localStorage: {getItem: k => storage.get('local:' + k) ?? null, setItem: (k, v) => storage.set('local:' + k, v), removeItem: k => storage.delete('local:' + k)},
     CustomEvent: class { constructor(type) { this.type = type; } },
     navigator: {}, confirm: () => true, prompt: () => null,
     fetch: async (url, options = {}) => {

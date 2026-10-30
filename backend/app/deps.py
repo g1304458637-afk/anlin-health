@@ -54,6 +54,15 @@ def is_staff_for(user: User, resident: Resident) -> bool:
     return user.role == "staff" and user.community_id == resident.community_id
 
 
+def family_can_write_vitals(db: Session, user: User, resident: Resident) -> bool:
+    # An active grant that explicitly allows entering readings on the resident's behalf.
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    grants = db.scalars(select(FamilyGrant).where(FamilyGrant.grantee_id == user.id,
+        FamilyGrant.resident_id == resident.id, FamilyGrant.revoked_at.is_(None))).all()
+    return any(g.expires_at and g.expires_at.replace(tzinfo=None) > now
+               and g.can_vitals and g.can_write_vitals for g in grants)
+
+
 def active_grant(db: Session, user: User, resident: Resident, scope: str) -> bool:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     grants = db.scalars(select(FamilyGrant).where(FamilyGrant.grantee_id == user.id, FamilyGrant.resident_id == resident.id, FamilyGrant.revoked_at.is_(None))).all()
@@ -68,6 +77,8 @@ def check_access(db: Session, user: User, resident: Resident | None, scope: str 
     if is_staff_for(user, resident) and consent_active(db, resident.id):
         return resident
     if not write and scope in {"profile", "vitals"} and user.role == "family" and active_grant(db, user, resident, scope):
+        return resident
+    if write and scope == "vitals" and user.role == "family" and family_can_write_vitals(db, user, resident):
         return resident
     # Do not disclose whether an inaccessible record exists.
     raise HTTPException(404, "档案不存在或无权访问")

@@ -105,3 +105,7 @@ button{touch-action:manipulation}
 .anlin-dialog-actions .anlin-dialog-ok{background:var(--dark,#0A0A0A);border-color:var(--dark,#0A0A0A);color:#fff}
 .anlin-dialog-actions .anlin-dialog-ok.danger{background:var(--danger,#C2453A);border-color:var(--danger,#C2453A)}
 .anlin-dialog.hidden{display:none}
+
+/* ---------- 大字模式（居民门户顶栏切换，localStorage 持久化） ---------- */
+html.large-mode body{zoom:1.25}
+html.large-mode .topbar .out{font-size:16px;padding:10px 14px}

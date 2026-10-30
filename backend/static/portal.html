@@ -53,7 +53,7 @@
   <div id="appView" class="hidden" style="display:flex;flex-direction:column;flex:1">
     <div class="topbar">
       <div class="who"><span class="mark">安</span><div>安邻健康<small id="whoami">—</small></div></div>
-      <button class="out" id="logoutBtn" type="button">退出</button>
+      <button class="out" id="fontToggle" type="button" aria-label="切换大字模式">大字</button><button class="out" id="logoutBtn" type="button">退出</button>
     </div>
     <main>
       <!-- 首页 -->
@@ -146,6 +146,8 @@
           <div class="field"><label for="pwNew">新密码（≥10位，三类字符）</label><input id="pwNew" type="password" autocomplete="new-password"></div>
           <button class="btn btn-line" id="pwBtn" type="button">更新密码</button>
         </div>
+        <div class="card" id="summaryCard"><div class="card-title-row"><h3>本周健康小结</h3><span class="helper" style="margin:0">最近 7 天</span></div><div id="summaryBody"><div class="empty">加载中...</div></div></div>
+        <div class="card"><h3>我的数据</h3><div class="helper">导出你自己的全部健康记录、风险提示与预约历史（CSV 文件，可用 Excel 打开）。</div><button class="btn btn-line" id="exportBtn" type="button" style="margin-top:10px">导出我的健康数据 (CSV)</button></div>
         <button class="btn btn-danger" id="logoutAll" type="button" style="width:100%;height:50px;border:1.5px solid #F3D9D6;background:#fff;border-radius:14px">退出所有设备</button>
         <div class="helper" style="text-align:center">演示环境 · 不可用于真实医疗诊断 · 遇急症请拨打 120</div>
       </section>

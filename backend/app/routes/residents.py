@@ -23,7 +23,8 @@ def serialize(db: Session, resident: Resident, user: User) -> ResidentOut:
     return ResidentOut(
         id=resident.id, name=resident.name, birth_year=resident.birth_year,
         sex=resident.sex, phone=resident.phone, community_id=resident.community_id,
-        owner_user_id=resident.owner_user_id, consent_active=consent_active(db, resident.id)
+        owner_user_id=resident.owner_user_id, consent_active=consent_active(db, resident.id),
+        alert_overrides=resident.alert_overrides
     )
 
 
@@ -85,6 +86,39 @@ def create_assisted_resident(body: AssistedResidentIn, user: User = Depends(requ
     audit(db, user, "create_assisted_resident", "resident", resident.id)
     db.commit()
     return serialize(db, resident, user)
+
+
+@router.patch("/community/residents/{resident_id}/alert-thresholds")
+def set_alert_thresholds(resident_id: int, body: dict,
+                         user: User = Depends(require_roles("staff")), db: Session = Depends(get_db)):
+    """Per-resident alert threshold overrides (staff, valid consent required).
+
+    Accepted shape: {"blood_pressure": {"warning_sys": 130, ...}, "blood_glucose": {...}}.
+    Keys not provided fall back to the built-in defaults; unknown keys are rejected.
+    """
+    from ..risk_rules import OVERRIDE_KEYS
+    resident = db.get(Resident, resident_id)
+    check_access(db, user, resident, scope="profile", write=True)
+    cleaned: dict = {}
+    for metric, fields in (body or {}).items():
+        if fields is None:
+            continue
+        if metric not in OVERRIDE_KEYS or not isinstance(fields, dict):
+            raise HTTPException(422, f"不支持的阈值项：{metric}")
+        allowed = OVERRIDE_KEYS[metric]
+        cleaned_fields = {}
+        for key, value in fields.items():
+            if value is None:
+                continue
+            if key not in allowed or not isinstance(value, (int, float)) or not 1 <= value <= 500:
+                raise HTTPException(422, f"阈值数值无效：{metric}.{key}")
+            cleaned_fields[key] = value
+        if cleaned_fields:
+            cleaned[metric] = cleaned_fields
+    resident.alert_overrides = cleaned or None
+    audit(db, user, "set_alert_thresholds", "resident", resident.id, {"metrics": sorted(cleaned)})
+    db.commit()
+    return {"resident_id": resident_id, "alert_overrides": resident.alert_overrides}
 
 
 @router.get("/residents/{resident_id}", response_model=ResidentOut)

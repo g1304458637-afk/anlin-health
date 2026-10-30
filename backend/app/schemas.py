@@ -121,6 +121,7 @@ class ResidentOut(Model):
     community_id: int
     owner_user_id: int | None
     consent_active: bool | None = None
+    alert_overrides: dict | None = None
 
 
 class ConsentIn(Model):
@@ -216,6 +217,7 @@ class VitalOut(Model):
     weight_kg: float | None
     measured_at: datetime
     measurement_context: str | None = None
+    recorded_by: str | None = None  # display name of who entered the reading
 
 
 class QuestionnaireOut(Model):
@@ -260,6 +262,8 @@ class FamilyGrantIn(Model):
     invite_code: str = Field(min_length=10, max_length=32)
     can_profile: bool = True
     can_vitals: bool = True
+    # Proxy entry: family may create vitals readings for the resident.
+    can_write_vitals: bool = False
     expires_in_days: int = Field(default=30, ge=1, le=365)
 
     @model_validator(mode="after")
@@ -278,6 +282,7 @@ class FamilyGrantOut(Model):
     can_vitals: bool
     expires_at: datetime
     revoked_at: datetime | None
+    can_write_vitals: bool = False
 
 
 class VisitIn(Model):

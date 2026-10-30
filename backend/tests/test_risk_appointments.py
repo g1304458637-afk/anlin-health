@@ -62,10 +62,16 @@ def test_staff_queue_is_community_scoped_and_ackable(client, token, db):
     alert_id = listing.json()["items"][0]["id"]
     # Another community's staff cannot see or acknowledge it.
     assert client.get("/api/community/risk-alerts", headers=token("staff2")).json()["open_count"] == 0
-    assert client.post(f"/api/community/risk-alerts/{alert_id}/ack", headers=token("staff2")).status_code == 404
-    assert client.post(f"/api/community/risk-alerts/{alert_id}/ack", headers=token("resident")).status_code == 403
-    acked = client.post(f"/api/community/risk-alerts/{alert_id}/ack", headers=token("staff"))
-    assert acked.status_code == 200
+    assert client.post(f"/api/community/risk-alerts/{alert_id}/ack", headers=token("staff2"),
+                       json={"outcome": "called"}).status_code == 404
+    assert client.post(f"/api/community/risk-alerts/{alert_id}/ack", headers=token("resident"),
+                       json={"outcome": "called"}).status_code == 403
+    acked = client.post(f"/api/community/risk-alerts/{alert_id}/ack", headers=token("staff"),
+                        json={"outcome": "visited", "outcome_note": "已上门复测"})
+    assert acked.status_code == 200 and acked.json()["outcome_label"] == "上门探访"
+    # outcome without a valid value is rejected
+    assert client.post(f"/api/community/risk-alerts/{alert_id}/ack", headers=token("staff"),
+                       json={"outcome": "magic"}).status_code == 422
     assert client.get("/api/community/risk-alerts", headers=token("staff")).json()["open_count"] == 0
     entry = db.query(AuditLog).filter(AuditLog.action == "risk_alert_acknowledged").count() == 1
 

@@ -12,7 +12,7 @@ from sqlalchemy import text
 from .db import engine, Base
 from .config import settings, validate_settings
 from . import models  # noqa: F401 - registers mappings
-from .routes import auth, residents, vitals, questionnaires, reminders, family, visits, admin, reporting, assistant, reports, report_assistant, plans, risk_alerts, appointments
+from .routes import auth, residents, vitals, questionnaires, reminders, family, visits, admin, reporting, assistant, reports, report_assistant, plans, risk_alerts, appointments, todo, summary
 
 
 @asynccontextmanager
@@ -66,7 +66,7 @@ async def security_headers(request: Request, call_next):
     return response
 
 
-for router in [auth.router, residents.router, vitals.router, questionnaires.router, reminders.router, family.router, visits.router, admin.router, reporting.router, assistant.router, reports.router, report_assistant.router, plans.router, risk_alerts.router, appointments.router]:
+for router in [auth.router, residents.router, vitals.router, questionnaires.router, reminders.router, family.router, visits.router, admin.router, reporting.router, assistant.router, reports.router, report_assistant.router, plans.router, risk_alerts.router, appointments.router, todo.router, summary.router]:
     app.include_router(router)
 
 class NoCacheStaticFiles(StaticFiles):

@@ -8,9 +8,9 @@
   "source_worktree": ".",
   "source_file_count": 137,
   "source_manifest_sha256": "90d7031a3d5d663e477b05481f4aec45e150d80bd9f73c5e5c573c8e74092e1e",
-  "scope": "feature update: non-diagnostic risk alerts (staff/family/resident surfaces) and resident appointment booking (staff visit / doctor accompaniment); cache governance for page assets",
+  "scope": "feature update: alert closed-loop (outcomes visible to family), alert-to-visit, BP trend notices, per-resident thresholds, console today-todo, appointment slot capacity + auto reminder, family proxy vitals entry, weekly digest, resident CSV export, large-font mode",
   "verification": {
-    "backend_tests_passed": 228,
+    "backend_tests_passed": 236,
     "frontend_tests_passed": 30,
     "browser": "real local browser E2E: staff popup -> risk board -> acknowledge; resident popup -> appointment create; health-page risk card; console appointment confirm/cancel buttons rendered",
     "deepseek": "final live report glucose, corrected title, missing potassium and medical-boundary cases passed; final browser page2 lookup passed",

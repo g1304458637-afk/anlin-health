@@ -61,6 +61,17 @@ def create_appointment(resident_id: int, body: AppointmentIn,
     if not is_owner(user, resident):
         raise HTTPException(403, "仅档案本人可预约")
     _validate_date(body.preferred_date)
+    # Slot capacity: pending+confirmed bookings for the same community/date/slot.
+    from ..config import env_int
+    cap = env_int("APPOINTMENT_SLOT_CAPACITY", 3)
+    taken = db.scalar(select(func.count()).select_from(Appointment)
+                      .join(Resident, Resident.id == Appointment.resident_id)
+                      .where(Resident.community_id == resident.community_id,
+                             Appointment.preferred_date == body.preferred_date,
+                             Appointment.time_slot == body.time_slot,
+                             Appointment.status.in_(["pending", "confirmed"]))) or 0
+    if taken >= cap:
+        raise HTTPException(409, "该日期时段的预约已满，请换一个日期或时段")
     booking = Appointment(resident_id=resident_id, requester_id=user.id, **body.model_dump())
     db.add(booking)
     db.flush()
@@ -142,6 +153,17 @@ def _staff_action(appointment_id: int, user: User, db: Session, action: str, res
         db.rollback()
         raise HTTPException(409, "预约状态已变化，请刷新")
     audit(db, user, f"appointment_{action}ed", "appointment", booking.id)
+    if action == "confirm":
+        from ..models import Reminder
+        exists = db.scalar(select(Reminder.id).where(
+            Reminder.resident_id == booking.resident_id, Reminder.type == "appointment",
+            Reminder.title.like(f"%#{booking.id}%"), Reminder.completed_at.is_(None)))
+        if not exists:
+            summary = f"{_KINDS.get(booking.kind, booking.kind)}（预约#{booking.id}）已确认：{booking.preferred_date.isoformat()} {_SLOTS.get(booking.time_slot, booking.time_slot)}"
+            if booking.response_note:
+                summary += f" · {booking.response_note}"
+            db.add(Reminder(resident_id=booking.resident_id, actor_id=user.id, type="appointment",
+                            title=summary[:120], due_date=booking.preferred_date))
     db.commit()
     db.refresh(booking)
     return _out(db, booking)

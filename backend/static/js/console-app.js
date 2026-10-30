@@ -38,14 +38,14 @@ async function refresh(){
     residents=rs;residentHasMore=rs.length===50;visits=vs;
     $('residentCount').textContent=stats.resident_count;
     if(visitStatsSeq===visitStatsRequestSeq)applyVisitStats(visitStats);
-    renderResidents();renderResidentsTable();renderVisits();
+    renderResidents();renderResidentsTable();renderVisits();loadTodo();
     if(currentView==='stats')loadStats();
     if(currentView==='visits')await loadVisitList();
   }catch(e){if(version===sessionVersion&&requestSeq===residentRequestSeq&&e.message!=='会话已切换')notify(e.message)}
 }
 $('today').textContent=new Date().toLocaleDateString('zh-CN',{month:'2-digit',day:'2-digit'});
 function openStaffReport(id){if(me?.role!=='staff')return;const r=residents.find(x=>x.id===id&&x.consent_active);if(!r)return notify('请先选择已授权的居民');window.anlinReports?.open(r.id,r.name)}
-function renderResidents(){if(!me||me.role!=='staff')return;$('residentRows').innerHTML=residents.map(r=>`<tr><td><span class="name-cell"><span class="avatar">${clean(r.name.slice(0,1))}</span>${clean(r.name)}</span></td><td>${r.birth_year}</td><td>${r.owner_user_id?'自主建档':'协助登记'}</td><td><span class="tag">${r.consent_active?'已授权':'未生效'}</span></td><td><button class="btn btn-sm" data-act="show-vital" data-id="${r.id}">＋ 记录指标</button> <button class="btn btn-sm" data-act="open-staff-report" data-id="${r.id}">报告导入</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">没有符合条件的居民</td></tr>'}
+function renderResidents(){if(!me||me.role!=='staff')return;$('residentRows').innerHTML=residents.map(r=>`<tr><td><span class="name-cell"><span class="avatar">${clean(r.name.slice(0,1))}</span>${clean(r.name)}</span></td><td>${r.birth_year}</td><td>${r.owner_user_id?'自主建档':'协助登记'}</td><td><span class="tag">${r.consent_active?'已授权':'未生效'}</span></td><td><button class="btn btn-sm" data-act="show-vital" data-id="${r.id}">＋ 记录指标</button> <button class="btn btn-sm" data-act="open-staff-report" data-id="${r.id}">报告导入</button> <button class="btn btn-sm" data-act="edit-thresholds" data-id="${r.id}">阈值</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">没有符合条件的居民</td></tr>'}
 function renderVisits(){$('visitRows').innerHTML=visits.slice(0,8).map(v=>{const r=residents.find(x=>x.id===v.resident_id);return `<div class="visit"><div class="visit-date">${clean(v.due_date.slice(5))}</div><div class="visit-meta"><div class="visit-name">${clean(r?.name||'居民档案 #'+v.resident_id)}</div><div class="visit-desc">${v.status==='done'?'走访已完成':'计划走访 · 待完成'}</div></div>${v.status==='done'?'<span class="tag">已完成</span>':`<button class="btn btn-sm" data-act="finish-visit" data-id="${v.id}"">完成</button>`}</div>`}).join('')||'<div class="empty">暂无随访任务</div>'}
 function modal(title,desc,fields,onSubmit){$('modalTitle').textContent=title;$('modalDesc').textContent=desc;$('modalFields').innerHTML=fields;$('overlay').style.display='flex';$('modalSubmit').disabled=false;$('modalForm').onsubmit=async e=>{e.preventDefault();if($('modalSubmit').disabled)return;$('modalSubmit').disabled=true;try{await onSubmit(new FormData(e.target));closeModal();await refresh();if(currentView==='residents')await loadResidentsView();notify('保存成功')}catch(err){notify(err.message)}finally{$('modalSubmit').disabled=false}}}
 function closeModal(){$('overlay').style.display='none';$('modalForm').onsubmit=null}
@@ -109,8 +109,25 @@ function renderResidentsTable(){
   if(me.role!=='staff')return;
   const box=document.getElementById('residentTable2');
   if(!box){setTimeout(renderResidentsTable,300);return}
-  box.innerHTML=residents.map(r=>'<tr><td><span class="name-cell"><span class="avatar">'+clean(r.name.slice(0,1))+'</span>'+clean(r.name)+'</span></td><td>'+r.birth_year+'</td><td>'+(r.owner_user_id?'自主建档':'协助登记')+'</td><td><span class="tag">'+(r.consent_active?'已授权':'未生效')+'</span></td><td><button class="btn btn-sm" data-act="show-vital" data-id="'+r.id+'">＋ 记录指标</button> <button class="btn btn-sm" data-act="open-staff-report" data-id="'+r.id+'">报告导入</button> <button class="btn btn-sm btn-danger" data-act="withdraw-consent" data-id="'+r.id+'">撤回授权</button></td></tr>').join('')||'<tr><td colspan="5" class="empty">没有符合条件的居民</td></tr>';
+  box.innerHTML=residents.map(r=>'<tr><td><span class="name-cell"><span class="avatar">'+clean(r.name.slice(0,1))+'</span>'+clean(r.name)+'</span></td><td>'+r.birth_year+'</td><td>'+(r.owner_user_id?'自主建档':'协助登记')+'</td><td><span class="tag">'+(r.consent_active?'已授权':'未生效')+'</span></td><td><button class="btn btn-sm" data-act="show-vital" data-id="'+r.id+'">＋ 记录指标</button> <button class="btn btn-sm" data-act="open-staff-report" data-id="'+r.id+'">报告导入</button> <button class="btn btn-sm" data-act="edit-thresholds" data-id="'+r.id+'">阈值</button> <button class="btn btn-sm btn-danger" data-act="withdraw-consent" data-id="'+r.id+'">撤回授权</button></td></tr>').join('')||'<tr><td colspan="5" class="empty">没有符合条件的居民</td></tr>';
   $('residentPaging').innerHTML='<button class="btn btn-sm" '+(residentOffset?'':'disabled')+' data-act="page-residents" data-step="-1">上一页</button><span class="sub">第 '+(Math.floor(residentOffset/50)+1)+' 页</span><button class="btn btn-sm" '+(residentHasMore?'':'disabled')+' data-act="page-residents" data-step="1">下一页</button>';
+}
+function editThresholds(id){
+  if(me?.role!=='staff')return;
+  const r=residents.find(x=>x.id===id);
+  if(!r)return notify('请先选择居民');
+  const cur=(r.alert_overrides||{});
+  const bp=cur.blood_pressure||{}, glu=cur.blood_glucose||{};
+  const numField=(label,name,val)=>field(label,name,'number',`step="1" min="20" max="400" placeholder="留空用默认" value="${val??''}"`);
+  modal('预警阈值 · '+r.name,'针对该居民的提示阈值（常见参考范围之外的个人化设定）。留空表示使用默认值；所有提示均不构成医疗诊断。',
+    '<div class="sect">血压</div>'+numField('收缩压-关注','w_sys',bp.warning_sys)+numField('舒张压-关注','w_dia',bp.warning_dia)+numField('收缩压-需尽快关注','c_sys',bp.critical_sys)+numField('舒张压-需尽快关注','c_dia',bp.critical_dia)
+    +'<div class="sect">血糖 (mmol/L)</div>'+numField('偏低','g_low',glu.warning_low)+numField('偏高','g_high',glu.warning_high)+numField('明显偏高','g_crit',glu.critical_high),
+    async d=>{
+      const payload={blood_pressure:{},blood_glucose:{}};
+      const map={w_sys:['blood_pressure','warning_sys'],w_dia:['blood_pressure','warning_dia'],c_sys:['blood_pressure','critical_sys'],c_dia:['blood_pressure','critical_dia'],g_low:['blood_glucose','warning_low'],g_high:['blood_glucose','warning_high'],g_crit:['blood_glucose','critical_high']};
+      for(const [key,[metric,fname]] of Object.entries(map)){const v=d.get(key);if(v)payload[metric][fname]=Number(v)}
+      try{await api(`/api/community/residents/${id}/alert-thresholds`,'PATCH',payload);notify('阈值已更新');refresh()}catch(e){notify(e.message)}
+    });
 }
 function searchResidents(q){residentQuery=q.trim();residentOffset=0;$('search').value=q;$('search2').value=q;clearTimeout(residentSearchTimer);residentSearchTimer=setTimeout(refresh,250)}
 function pageResidents(step){if(step>0&&!residentHasMore)return;residentOffset=Math.max(0,residentOffset+step*50);refresh()}
@@ -312,8 +329,21 @@ async function logoutAllDevices(){
   try{await api('/api/auth/logout-all','POST');logout();notify('已在所有设备退出登录')}catch(e){notify(e.message)}
 }
 
+/* ------- 今日待办 ------- */
+const TODO_VIEWS={critical_alert:'risk',warning_alert:'risk',overdue_visit:'visits',pending_appointment:'appointments',pending_claim:'residents',pending_consent:'residents'};
+const TODO_LABELS={critical_alert:'需尽快关注',warning_alert:'关注',overdue_visit:'随访逾期',pending_appointment:'预约待确认',pending_claim:'认领核验',pending_consent:'同意复核'};
+async function loadTodo(){
+  const version=sessionVersion;
+  try{
+    const data=await api('/api/community/today-todo');
+    if(version!==sessionVersion)return;
+    $('todoCounts').textContent=data.total?('共 '+data.total+' 项'):'今日清清爽爽';
+    $('todoList').innerHTML=data.items.length?data.items.map(i=>`<div class="queue-item"><span class="chip">${TODO_LABELS[i.kind]||i.kind}</span><b>${clean(i.resident)}</b><span>${clean(i.label)}</span><button class="btn btn-sm" data-act="todo-goto" data-kind="${i.kind}" data-ref="${i.ref_id}">去处理</button></div>`).join(''):'<div class="empty">今天没有待办事项</div>';
+  }catch(e){$('todoList').innerHTML='<div class="empty">'+clean(e.message)+'</div>'}
+}
+
 /* ------- 风险预警 ------- */
-const RISK_METRICS={blood_pressure:'血压',blood_glucose:'血糖',weight:'体重'};
+const RISK_METRICS={blood_pressure:'血压',blood_pressure_trend:'血压趋势',blood_glucose:'血糖',weight:'体重'};
 let riskOffset=0;
 async function loadRiskView(){
   const version=sessionVersion;
@@ -326,15 +356,27 @@ async function loadRiskView(){
     $('riskOpenCount').textContent=data.open_count;
     $('riskRows').innerHTML=data.items.length?data.items.map(a=>{
       const time=new Date(a.created_at);const when=isNaN(time)?'':time.toLocaleString('zh-CN');
-      const action=a.acknowledged_at?'<span class="sub">已处理</span>':`<button class="btn btn-sm" data-act="ack-risk" data-id="${a.id}">标记已处理</button>`;
+      let action;
+      if(a.acknowledged_at){
+        action=`<span class="sub">已处理 · ${a.outcome_label||''}${a.outcome_note?'：'+clean(a.outcome_note):''}</span>`;
+      }else{
+        action=`<button class="btn btn-sm" data-act="ack-risk" data-id="${a.id}">处理</button> <button class="btn btn-sm" data-act="to-visit" data-id="${a.id}">转随访</button>`;
+      }
       const levelTag=a.level==='critical'?'<span class="chip" style="background:#FDECE8;color:#C2453A">需尽快关注</span>':'<span class="chip">关注</span>';
       return '<tr><td>'+(a.resident_name||('#'+a.resident_id))+'</td><td>'+(RISK_METRICS[a.metric]||a.metric)+'</td><td>'+levelTag+'</td><td>'+clean(a.value_text)+'</td><td>'+when+'</td><td class="sub" style="max-width:320px">'+clean(a.message)+'</td><td>'+action+'</td></tr>';
     }).join(''):'<tr><td colspan="7" class="empty">当前筛选下没有预警记录</td></tr>';
     $('riskPaging').innerHTML='<button class="btn btn-sm" '+(riskOffset?'':'disabled')+' data-act="page-risk" data-step="-1">上一页</button><span class="sub">第 '+(Math.floor(riskOffset/25)+1)+' 页</span><button class="btn btn-sm" '+(riskOffset+25>=data.total?'':'disabled')+' data-act="page-risk" data-step="1">下一页</button>';
   }catch(e){notify(e.message)}
 }
-async function ackRisk(id){
-  try{await api(`/api/community/risk-alerts/${id}/ack`,'POST');notify('已标记为处理完成');loadRiskView()}catch(e){notify(e.message)}
+const OUTCOME_LABELS={called:'电话慰问',visited:'上门探访',referred:'建议就医',no_action:'暂无需处理'};
+function ackRisk(id){
+  const selectField=`<div class="field"><label for="ackOutcome">处理方式</label><select name="outcome" id="ackOutcome">${Object.entries(OUTCOME_LABELS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>`;
+  modal('处理风险预警','请选择本次处理方式；处理结果家属端可见。',selectField+field('备注（选填）','outcome_note','text','maxlength="300"'),async d=>{
+    try{await api(`/api/community/risk-alerts/${id}/ack`,'POST',{outcome:d.get('outcome'),outcome_note:d.get('outcome_note')||null});notify('已记录处理结果');loadRiskView()}catch(e){notify(e.message)}
+  });
+}
+async function toVisit(id){
+  try{const out=await api(`/api/community/risk-alerts/${id}/to-visit`,'POST');notify('已生成随访任务（'+out.due_date+' 上门）')}catch(e){notify(e.message)}
 }
 /* ------- 预约管理 ------- */
 const APPT_STATUS={pending:'待确认',confirmed:'已确认',completed:'已完成',cancelled:'已取消'};
@@ -397,7 +439,10 @@ window.AnlinCore.bindActions({
   'disable-mfa': () => disableMFA(),
   'logout-all': () => logoutAllDevices(),
   'close-modal': () => closeModal(),
+  'todo-goto': ds => switchView(TODO_VIEWS[ds.kind] || 'overview'),
   'ack-risk': ds => ackRisk(Number(ds.id)),
+  'to-visit': ds => toVisit(Number(ds.id)),
+  'edit-thresholds': ds => editThresholds(Number(ds.id)),
   'page-risk': ds => {riskOffset=Math.max(0,riskOffset+Number(ds.step)*25);loadRiskView()},
   'page-appt': ds => {apptOffset=Math.max(0,apptOffset+Number(ds.step)*25);loadAppointmentsView()},
   'appt-confirm': ds => apptAction(Number(ds.id),'confirm','确认',true),

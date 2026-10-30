@@ -2,15 +2,24 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import audit, auth_user, check_access, require_roles
-from ..models import Resident, RiskAlert, User
+from ..models import Resident, RiskAlert, User, Visit
 from ..reporting import visible_resident_ids
 
 router = APIRouter(prefix="/api", tags=["risk alerts"])
+
+OUTCOMES = {"called": "电话慰问", "visited": "上门探访", "referred": "建议就医", "no_action": "暂无需处理"}
+
+
+class RiskAckIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    outcome: str = Field(pattern="^(called|visited|referred|no_action)$")
+    outcome_note: str | None = Field(default=None, max_length=300)
 
 
 def _out(alert: RiskAlert, resident: Resident | None) -> dict:
@@ -18,7 +27,10 @@ def _out(alert: RiskAlert, resident: Resident | None) -> dict:
             "resident_name": resident.name if resident else None,
             "vital_id": alert.vital_id, "metric": alert.metric, "level": alert.level,
             "value_text": alert.value_text, "message": alert.message,
-            "acknowledged_at": alert.acknowledged_at, "created_at": alert.created_at}
+            "acknowledged_at": alert.acknowledged_at,
+            "outcome": alert.outcome, "outcome_label": OUTCOMES.get(alert.outcome),
+            "outcome_note": alert.outcome_note,
+            "created_at": alert.created_at}
 
 
 @router.get("/residents/{resident_id}/risk-alerts")
@@ -62,16 +74,46 @@ def community_risk_alerts(response: Response, level: str | None = Query(None, pa
             "total": total, "open_count": open_count, "limit": limit, "offset": offset}
 
 
-@router.post("/community/risk-alerts/{alert_id}/ack")
-def acknowledge_alert(alert_id: int, user: User = Depends(require_roles("staff")),
-                      db: Session = Depends(get_db)):
+def _open_alert_for_staff(db: Session, alert_id: int, user: User) -> RiskAlert:
     alert = db.get(RiskAlert, alert_id)
     resident = db.get(Resident, alert.resident_id) if alert else None
     if not alert or not resident or resident.community_id != user.community_id:
         raise HTTPException(404, "预警不存在")
+    return alert
+
+
+@router.post("/community/risk-alerts/{alert_id}/ack")
+def acknowledge_alert(alert_id: int, body: RiskAckIn,
+                      user: User = Depends(require_roles("staff")), db: Session = Depends(get_db)):
+    """Close the loop: record how staff responded, not just that they looked."""
+    alert = _open_alert_for_staff(db, alert_id, user)
     if alert.acknowledged_at is None:
         alert.acknowledged_at = datetime.now(timezone.utc)
         alert.acknowledged_by_id = user.id
-        audit(db, user, "risk_alert_acknowledged", "risk_alert", alert.id)
+        alert.outcome = body.outcome
+        alert.outcome_note = body.outcome_note
+        audit(db, user, "risk_alert_acknowledged", "risk_alert", alert.id,
+              {"outcome": body.outcome})
         db.commit()
-    return {"ok": True}
+    return {"ok": True, "outcome_label": OUTCOMES.get(alert.outcome)}
+
+
+@router.post("/community/risk-alerts/{alert_id}/to-visit", status_code=201)
+def alert_to_visit(alert_id: int, user: User = Depends(require_roles("staff")), db: Session = Depends(get_db)):
+    """One click: turn an open alert into a planned home-visit task for the resident."""
+    alert = _open_alert_for_staff(db, alert_id, user)
+    if alert.acknowledged_at is not None:
+        raise HTTPException(409, "该预警已处理，可直接在入户随访中新建任务")
+    existing = db.scalar(select(Visit.id).where(
+        Visit.resident_id == alert.resident_id, Visit.status == "planned", Visit.staff_id == user.id,
+        Visit.note.like(f"[风险预警 #{alert.id}]%")))
+    if existing:
+        raise HTTPException(409, "该预警已生成过随访任务")
+    tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
+    visit = Visit(resident_id=alert.resident_id, staff_id=user.id, due_date=tomorrow, status="planned",
+                  note=f"[风险预警 #{alert.id}] {alert.metric} {alert.value_text} —— 上门复测并了解情况")
+    db.add(visit)
+    db.flush()
+    audit(db, user, "risk_alert_to_visit", "visit", visit.id, {"alert_id": alert.id})
+    db.commit()
+    return {"visit_id": visit.id, "due_date": visit.due_date.isoformat()}

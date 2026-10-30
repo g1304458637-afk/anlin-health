@@ -26,7 +26,8 @@ def grant_output(db: Session, g: FamilyGrant) -> FamilyGrantOut:
     member = db.get(User, g.grantee_id)
     return FamilyGrantOut(id=g.id, resident_id=g.resident_id, grantee_id=g.grantee_id,
         grantee_name=member.display_name if member else "已停用账号", can_profile=g.can_profile,
-        can_vitals=g.can_vitals, expires_at=g.expires_at, revoked_at=g.revoked_at)
+        can_vitals=g.can_vitals, can_write_vitals=g.can_write_vitals,
+        expires_at=g.expires_at, revoked_at=g.revoked_at)
 
 
 @router.post("/residents/{resident_id}/family-grants", response_model=FamilyGrantOut, status_code=201)
@@ -43,7 +44,8 @@ def grant_family(resident_id: int, body: FamilyGrantIn, user: User = Depends(aut
     for old in db.scalars(select(FamilyGrant).where(FamilyGrant.resident_id == resident_id, FamilyGrant.grantee_id == recipient.id, FamilyGrant.revoked_at.is_(None))).all():
         old.revoked_at = now
     g = FamilyGrant(resident_id=resident_id, grantee_id=recipient.id, can_profile=body.can_profile,
-                    can_vitals=body.can_vitals, expires_at=now + timedelta(days=body.expires_in_days))
+                    can_vitals=body.can_vitals, can_write_vitals=body.can_write_vitals,
+                    expires_at=now + timedelta(days=body.expires_in_days))
     db.add(g)
     db.flush()
     audit(db, user, "grant_family_access", "family_grant", g.id)
@@ -105,6 +107,9 @@ def shared_residents(user: User = Depends(auth_user), db: Session = Depends(get_
         if not (profile or vitals):
             continue
         result.append({"resident_id": r.id, "grant_id": g.id, "expires_at": g.expires_at,
-                       "name": r.name if profile else "授权居民", "can_profile": profile, "can_vitals": vitals})
+                       "name": r.name if profile else "授权居民", "can_profile": profile, "can_vitals": vitals,
+                       "can_write_vitals": active_grant(db, user, r, "vitals") and any(
+                           g.can_write_vitals for g in grants if g.resident_id == r.id and not g.revoked_at
+                           and g.expires_at.replace(tzinfo=None) > datetime.now(timezone.utc).replace(tzinfo=None))})
         seen.add(r.id)
     return result
