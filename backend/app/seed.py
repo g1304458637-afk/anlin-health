@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone, date
 from sqlalchemy import select
 from .db import SessionLocal, Base, engine
 from .config import settings
-from .models import User, Community, Resident, ConsentEvent, Vital, Reminder, Questionnaire, Visit, RiskAlert, Appointment
+from .models import User, Community, Resident, ConsentEvent, Vital, Reminder, Questionnaire, Visit, RiskAlert, Appointment, FamilyGrant
 from .security import hash_password, new_invite_code
 
 SAMPLE_QS = [
@@ -49,6 +49,8 @@ def seed():
             db.add(Vital(resident_id=r1.id, actor_id=resident_user.id, type="blood_pressure", systolic=systolic,
                 diastolic=diastolic, measured_at=datetime.now(timezone.utc)-timedelta(days=days)))
         db.add(Vital(resident_id=r2.id, actor_id=staff.id, type="blood_glucose", glucose_mmol_l=5.8))
+        db.add(FamilyGrant(resident_id=r1.id, grantee_id=family_user.id, can_profile=True, can_vitals=True,
+            expires_at=datetime.now(timezone.utc)+timedelta(days=365)))
         db.add(Reminder(resident_id=r1.id, actor_id=resident_user.id, type="measure", title="记录今天的血压", due_date=date.today()))
         db.add(Reminder(resident_id=r1.id, actor_id=resident_user.id, type="followup", title="看看预约是否有社区回复", due_date=date.today()+timedelta(days=1)))
         db.add(Visit(resident_id=r2.id, staff_id=staff.id, due_date=date.today()+timedelta(days=1), status="planned"))
